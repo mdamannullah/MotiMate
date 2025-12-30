@@ -1,0 +1,436 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MotiMate Design System - Warm Coral/Peach Theme */
+/* Matching the reference exactly - no deviation */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* Primary Coral/Peach Palette */
+    --primary: 8 65% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 12 70% 75%;
+    --primary-dark: 8 60% 55%;
+    
+    /* Warm Cream Background */
+    --background: 20 100% 97%;
+    --foreground: 0 0% 20%;
+    
+    /* Cards - Pure White */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+    
+    /* Secondary - Lighter Coral */
+    --secondary: 12 80% 92%;
+    --secondary-foreground: 8 60% 45%;
+    
+    /* Muted - Soft Gray */
+    --muted: 20 20% 94%;
+    --muted-foreground: 0 0% 45%;
+    
+    /* Accent - Warm Peach */
+    --accent: 15 90% 85%;
+    --accent-foreground: 8 60% 40%;
+    
+    /* Success Green */
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders */
+    --border: 20 30% 90%;
+    --input: 20 30% 90%;
+    --ring: 8 65% 65%;
+    
+    --radius: 1rem;
+    
+    /* Chat Colors */
+    --chat-user: 8 65% 65%;
+    --chat-bot: 200 15% 92%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(8 65% 65%) 0%, hsl(15 70% 70%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(20 100% 97%) 0%, hsl(15 80% 93%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(20 50% 98%) 100%);
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsla(8, 65%, 65%, 0.15);
+    --shadow-card: 0 8px 30px -8px hsla(0, 0%, 0%, 0.1);
+    --shadow-button: 0 4px 15px -3px hsla(8, 65%, 65%, 0.4);
+    
+    /* Sidebar */
+    --sidebar-background: 20 100% 97%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 8 65% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 15 90% 85%;
+    --sidebar-accent-foreground: 8 60% 40%;
+    --sidebar-border: 20 30% 90%;
+    --sidebar-ring: 8 65% 65%;
+  }
+
+  .dark {
+    /* Dark Theme - Near Black with Coral Accents */
+    --primary: 8 65% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 12 60% 65%;
+    --primary-dark: 8 55% 50%;
+    
+    /* Dark Background */
+    --background: 230 25% 12%;
+    --foreground: 0 0% 95%;
+    
+    /* Dark Cards */
+    --card: 230 20% 16%;
+    --card-foreground: 0 0% 95%;
+    
+    --popover: 230 20% 16%;
+    --popover-foreground: 0 0% 95%;
+    
+    /* Secondary */
+    --secondary: 230 20% 20%;
+    --secondary-foreground: 0 0% 90%;
+    
+    /* Muted */
+    --muted: 230 15% 22%;
+    --muted-foreground: 0 0% 60%;
+    
+    /* Accent */
+    --accent: 230 20% 25%;
+    --accent-foreground: 8 65% 65%;
+    
+    /* Success */
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 100%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders */
+    --border: 230 15% 25%;
+    --input: 230 15% 25%;
+    --ring: 8 65% 60%;
+    
+    /* Chat Colors */
+    --chat-user: 8 65% 55%;
+    --chat-bot: 230 20% 22%;
+    
+    /* Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(8 65% 55%) 0%, hsl(15 60% 60%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(230 25% 12%) 0%, hsl(230 20% 15%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(230 20% 18%) 0%, hsl(230 20% 14%) 100%);
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsla(8, 65%, 55%, 0.2);
+    --shadow-card: 0 8px 30px -8px hsla(0, 0%, 0%, 0.4);
+    --shadow-button: 0 4px 15px -3px hsla(8, 65%, 55%, 0.5);
+    
+    /* Sidebar */
+    --sidebar-background: 230 25% 12%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 8 65% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 230 20% 25%;
+    --sidebar-accent-foreground: 8 65% 60%;
+    --sidebar-border: 230 15% 25%;
+    --sidebar-ring: 8 65% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Nunito', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Nunito', sans-serif;
+  }
+}
+
+@layer components {
+  /* Mobile Container */
+  .mobile-container {
+    @apply max-w-md mx-auto min-h-screen relative;
+    background: var(--gradient-hero);
+  }
+
+  /* App Header */
+  .app-header {
+    @apply sticky top-0 z-50 px-4 py-3 flex items-center justify-between;
+    background: hsla(var(--background) / 0.8);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Bottom Navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 max-w-md mx-auto;
+    @apply flex items-center justify-around py-2 px-4;
+    @apply bg-card/95 backdrop-blur-lg border-t border-border;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-1 px-3 py-2 rounded-xl;
+    @apply text-muted-foreground transition-all duration-300;
+  }
+
+  .bottom-nav-item.active {
+    @apply text-primary bg-primary/10;
+  }
+
+  /* Cards */
+  .moti-card {
+    @apply bg-card rounded-2xl p-4;
+    box-shadow: var(--shadow-card);
+  }
+
+  .moti-card-elevated {
+    @apply bg-card rounded-2xl p-4;
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground font-semibold py-3 px-6 rounded-xl;
+    @apply transition-all duration-300 active:scale-95;
+    box-shadow: var(--shadow-button);
+  }
+
+  .btn-primary:hover {
+    @apply opacity-90;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground font-semibold py-3 px-6 rounded-xl;
+    @apply border border-primary/20 transition-all duration-300 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply text-foreground font-medium py-3 px-6 rounded-xl;
+    @apply transition-all duration-300 hover:bg-muted active:scale-95;
+  }
+
+  /* Input Fields */
+  .moti-input {
+    @apply w-full bg-card border border-border rounded-xl px-4 py-3;
+    @apply text-foreground placeholder:text-muted-foreground;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+    @apply transition-all duration-200;
+  }
+
+  /* Chat Bubbles */
+  .chat-bubble-user {
+    @apply max-w-[80%] p-3 rounded-2xl rounded-br-md ml-auto;
+    background: hsl(var(--chat-user));
+    @apply text-primary-foreground;
+  }
+
+  .chat-bubble-bot {
+    @apply max-w-[80%] p-3 rounded-2xl rounded-bl-md mr-auto;
+    background: hsl(var(--chat-bot));
+    @apply text-foreground;
+  }
+
+  /* Avatar */
+  .avatar-circle {
+    @apply rounded-full overflow-hidden flex items-center justify-center;
+    @apply bg-gradient-to-br from-primary to-primary-light;
+  }
+
+  /* Stats Card */
+  .stats-card {
+    @apply bg-card rounded-2xl p-4 flex flex-col items-center justify-center;
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Progress Ring */
+  .progress-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+
+  /* Floating Action Button */
+  .fab {
+    @apply fixed bottom-24 right-4 w-14 h-14 rounded-full;
+    @apply bg-primary text-primary-foreground flex items-center justify-center;
+    @apply shadow-lg active:scale-90 transition-transform;
+    box-shadow: var(--shadow-button);
+  }
+
+  /* Onboarding Dots */
+  .onboarding-dot {
+    @apply w-2 h-2 rounded-full bg-muted-foreground/30 transition-all duration-300;
+  }
+
+  .onboarding-dot.active {
+    @apply w-6 bg-primary;
+  }
+
+  /* List Items */
+  .list-item {
+    @apply flex items-center gap-3 p-4 rounded-xl bg-card;
+    @apply transition-all duration-200 active:scale-[0.98];
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Badge */
+  .moti-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* OTP Input */
+  .otp-input {
+    @apply w-12 h-14 text-center text-xl font-bold rounded-xl;
+    @apply bg-card border-2 border-border;
+    @apply focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
+    @apply transition-all duration-200;
+  }
+
+  /* Score Circle */
+  .score-circle {
+    @apply w-24 h-24 rounded-full flex items-center justify-center;
+    @apply bg-gradient-to-br from-primary to-primary-light;
+    @apply text-primary-foreground font-bold text-2xl;
+    box-shadow: var(--shadow-button);
+  }
+}
+
+@layer utilities {
+  /* Safe area padding */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Hide scrollbar */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Glass Effect */
+  .glass {
+    background: hsla(var(--card) / 0.7);
+    backdrop-filter: blur(12px);
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from { 
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes bounce-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.5s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-bounce-soft {
+  animation: bounce-soft 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Staggered animations */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
