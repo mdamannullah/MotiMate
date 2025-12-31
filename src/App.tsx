@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { DataProvider } from "@/contexts/DataContext";
 
-// Pages import karte hain
 import SplashScreen from "./pages/SplashScreen";
 import OnboardingScreen from "./pages/OnboardingScreen";
 import HomeScreen from "./pages/HomeScreen";
@@ -23,6 +23,11 @@ import SettingsScreen from "./pages/SettingsScreen";
 import SubscriptionScreen from "./pages/SubscriptionScreen";
 import AboutScreen from "./pages/AboutScreen";
 import ContactScreen from "./pages/ContactScreen";
+import NotificationsScreen from "./pages/NotificationsScreen";
+import ChangePasswordScreen from "./pages/ChangePasswordScreen";
+import PrivacySettingsScreen from "./pages/PrivacySettingsScreen";
+import TermsScreen from "./pages/TermsScreen";
+import DeleteAccountScreen from "./pages/DeleteAccountScreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,36 +36,38 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes - login se pehle */}
-              <Route path="/" element={<SplashScreen />} />
-              <Route path="/onboarding" element={<OnboardingScreen />} />
-              <Route path="/home" element={<HomeScreen />} />
-              <Route path="/login" element={<LoginScreen />} />
-              <Route path="/signup" element={<SignupScreen />} />
-              <Route path="/verify-otp" element={<VerifyOtpScreen />} />
-              <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
-              <Route path="/about" element={<AboutScreen />} />
-              <Route path="/contact" element={<ContactScreen />} />
-              
-              {/* Protected routes - login ke baad */}
-              <Route path="/dashboard" element={<DashboardScreen />} />
-              <Route path="/ai-tutor" element={<AiTutorScreen />} />
-              <Route path="/tests" element={<TestsScreen />} />
-              <Route path="/analytics" element={<AnalyticsScreen />} />
-              <Route path="/profile" element={<ProfileScreen />} />
-              <Route path="/settings" element={<SettingsScreen />} />
-              <Route path="/subscription" element={<SubscriptionScreen />} />
-              
-              {/* Catch-all route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        <DataProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<SplashScreen />} />
+                <Route path="/onboarding" element={<OnboardingScreen />} />
+                <Route path="/home" element={<HomeScreen />} />
+                <Route path="/login" element={<LoginScreen />} />
+                <Route path="/signup" element={<SignupScreen />} />
+                <Route path="/verify-otp" element={<VerifyOtpScreen />} />
+                <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+                <Route path="/about" element={<AboutScreen />} />
+                <Route path="/contact" element={<ContactScreen />} />
+                <Route path="/dashboard" element={<DashboardScreen />} />
+                <Route path="/ai-tutor" element={<AiTutorScreen />} />
+                <Route path="/tests" element={<TestsScreen />} />
+                <Route path="/analytics" element={<AnalyticsScreen />} />
+                <Route path="/profile" element={<ProfileScreen />} />
+                <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/subscription" element={<SubscriptionScreen />} />
+                <Route path="/notifications" element={<NotificationsScreen />} />
+                <Route path="/change-password" element={<ChangePasswordScreen />} />
+                <Route path="/privacy-settings" element={<PrivacySettingsScreen />} />
+                <Route path="/terms" element={<TermsScreen />} />
+                <Route path="/delete-account" element={<DeleteAccountScreen />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </DataProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
