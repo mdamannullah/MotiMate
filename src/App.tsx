@@ -17,6 +17,7 @@ import ForgotPasswordScreen from "./pages/ForgotPasswordScreen";
 import DashboardScreen from "./pages/DashboardScreen";
 import AiTutorScreen from "./pages/AiTutorScreen";
 import TestsScreen from "./pages/TestsScreen";
+import TakeTestScreen from "./pages/TakeTestScreen";
 import AnalyticsScreen from "./pages/AnalyticsScreen";
 import ProfileScreen from "./pages/ProfileScreen";
 import SettingsScreen from "./pages/SettingsScreen";
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/dashboard" element={<DashboardScreen />} />
                 <Route path="/ai-tutor" element={<AiTutorScreen />} />
                 <Route path="/tests" element={<TestsScreen />} />
+                <Route path="/test/:testId" element={<TakeTestScreen />} />
                 <Route path="/analytics" element={<AnalyticsScreen />} />
                 <Route path="/profile" element={<ProfileScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />

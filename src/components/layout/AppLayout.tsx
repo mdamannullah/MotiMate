@@ -15,8 +15,10 @@ export function AppLayout({ children, showNav = true }: AppLayoutProps) {
       {showNav && <Sidebar />}
       
       {/* Main Content */}
-      <div className="flex-1 lg:max-w-none max-w-md mx-auto w-full">
-        {children}
+      <div className="flex-1 lg:max-w-none max-w-md mx-auto w-full bg-background">
+        <div className="lg:max-w-4xl lg:mx-auto">
+          {children}
+        </div>
       </div>
       
       {/* Mobile Bottom Nav */}
