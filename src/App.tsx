@@ -29,6 +29,10 @@ import ChangePasswordScreen from "./pages/ChangePasswordScreen";
 import PrivacySettingsScreen from "./pages/PrivacySettingsScreen";
 import TermsScreen from "./pages/TermsScreen";
 import DeleteAccountScreen from "./pages/DeleteAccountScreen";
+import LiveTranslateScreen from "./pages/LiveTranslateScreen";
+import NotesScreen from "./pages/NotesScreen";
+import HelpScreen from "./pages/HelpScreen";
+import LanguageSettingsScreen from "./pages/LanguageSettingsScreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +69,10 @@ const App = () => (
                 <Route path="/privacy-settings" element={<PrivacySettingsScreen />} />
                 <Route path="/terms" element={<TermsScreen />} />
                 <Route path="/delete-account" element={<DeleteAccountScreen />} />
+                <Route path="/live-translate" element={<LiveTranslateScreen />} />
+                <Route path="/notes" element={<NotesScreen />} />
+                <Route path="/help" element={<HelpScreen />} />
+                <Route path="/language" element={<LanguageSettingsScreen />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -6,13 +7,26 @@ import { MotiCard } from '@/components/ui/MotiCard';
 import { MotiButton } from '@/components/ui/MotiButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { User, Mail, Crown, Settings, FileText, Star, ChevronRight, LogOut, Edit2 } from 'lucide-react';
+import { User, Mail, Crown, Settings, FileText, Star, ChevronRight, LogOut, Camera } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { stats } = useData();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem('motimate_avatar'));
 
   const menuItems = [
     { icon: FileText, label: 'My Notes', path: '/notes' },
@@ -26,6 +40,20 @@ export default function ProfileScreen() {
     navigate('/home', { replace: true });
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setAvatar(base64);
+        localStorage.setItem('motimate_avatar', base64);
+        toast.success('Profile photo updated!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="min-h-screen pb-24 lg:pb-8">
       <div className="lg:hidden">
@@ -33,16 +61,30 @@ export default function ProfileScreen() {
       </div>
 
       <main className="px-4 py-4 space-y-6 lg:px-8">
-        {/* Profile Card */}
         <MotiCard delay={0.1}>
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                <span className="text-primary font-bold text-2xl">{user?.name?.charAt(0) || 'S'}</span>
+                {avatar ? (
+                  <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-primary font-bold text-2xl">{user?.name?.charAt(0) || 'S'}</span>
+                )}
               </div>
-              <motion.button whileTap={{ scale: 0.9 }} className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg">
-                <Edit2 size={14} />
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg"
+              >
+                <Camera size={14} />
               </motion.button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold">{user?.name || 'Student'}</h2>
@@ -57,7 +99,6 @@ export default function ProfileScreen() {
           </div>
         </MotiCard>
 
-        {/* Contact Info - Only Email */}
         <div>
           <h3 className="font-semibold mb-3">Contact Information</h3>
           <MotiCard delay={0.2}>
@@ -73,7 +114,6 @@ export default function ProfileScreen() {
           </MotiCard>
         </div>
 
-        {/* Quick Stats - from actual data */}
         <div>
           <h3 className="font-semibold mb-3">Your Stats</h3>
           <div className="grid grid-cols-3 gap-3">
@@ -92,7 +132,6 @@ export default function ProfileScreen() {
           </div>
         </div>
 
-        {/* Menu Items */}
         <div className="space-y-2">
           {menuItems.map((item, index) => (
             <MotiCard key={item.label} delay={0.4 + index * 0.05} onClick={() => navigate(item.path)} className="cursor-pointer">
@@ -107,10 +146,33 @@ export default function ProfileScreen() {
           ))}
         </div>
 
-        <MotiButton onClick={handleLogout} variant="outline" size="full" icon={<LogOut size={18} />} className="border-destructive text-destructive hover:bg-destructive/5">
+        <MotiButton
+          onClick={() => setShowLogoutDialog(true)}
+          variant="outline"
+          size="full"
+          icon={<LogOut size={18} />}
+          className="border-destructive text-destructive hover:bg-destructive/5"
+        >
           Logout
         </MotiButton>
       </main>
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to logout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will need to login again to access your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Logout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
