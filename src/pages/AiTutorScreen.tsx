@@ -1,268 +1,155 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Send, Mic, Sparkles, Book, HelpCircle, Lightbulb, Calculator, Atom, Leaf, Globe } from 'lucide-react';
-import aiTutorAvatar from '@/assets/ai-tutor-avatar.png';
+import { Send, Paperclip, Mic, X, Image, FileText, Camera, Sparkles, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface MediaFile {
+  id: string;
+  type: 'image' | 'document' | 'audio';
+  url: string;
+  name: string;
+}
 
 interface Message {
   id: string;
   type: 'user' | 'bot';
   text: string;
+  media?: MediaFile[];
   timestamp: Date;
 }
 
-// More suggestion categories
-const suggestionCategories = [
-  { icon: Atom, text: 'Explain atomic structure', category: 'Chemistry' },
-  { icon: Calculator, text: 'Solve quadratic equations', category: 'Math' },
-  { icon: HelpCircle, text: 'What is photosynthesis?', category: 'Biology' },
-  { icon: Lightbulb, text: 'Tips for exam preparation', category: 'Study' },
-  { icon: Book, text: "Summarize Newton's laws", category: 'Physics' },
-  { icon: Globe, text: 'Explain the water cycle', category: 'Geography' },
-];
-
 // Comprehensive AI response system
 const aiKnowledgeBase: Record<string, string> = {
-  // Physics
-  'photosynthesis': `🌱 **Photosynthesis** is how plants make their food!
+  'photosynthesis': `**Photosynthesis** is how plants make their food using sunlight.
 
-**Simple Explanation:**
-Plants take in sunlight, water (H₂O), and carbon dioxide (CO₂) and convert them into glucose (sugar) and oxygen.
-
-**The Formula:**
-6CO₂ + 6H₂O + Light Energy → C₆H₁₂O₆ + 6O₂
+**Formula:** 6CO₂ + 6H₂O + Light → C₆H₁₂O₆ + 6O₂
 
 **Key Points:**
-• Happens in chloroplasts (containing chlorophyll)
-• Chlorophyll gives plants their green color
-• Oxygen is released as a byproduct
-• Glucose is used for energy and growth
+• Happens in chloroplasts
+• Chlorophyll captures light energy
+• Produces glucose and oxygen
+• Essential for life on Earth`,
 
-**Fun Fact:** One large tree can provide enough oxygen for 4 people per day! 🌳`,
+  'newton': `**Newton's Laws of Motion**
 
-  'newton': `⚡ **Newton's Three Laws of Motion**
+**1st Law (Inertia):** Objects stay at rest or in motion unless acted upon by a force.
 
-**1️⃣ First Law (Law of Inertia):**
-"An object at rest stays at rest, and an object in motion stays in motion, unless acted upon by an external force."
-*Example: A ball won't move unless you kick it!*
+**2nd Law:** F = ma (Force = mass × acceleration)
 
-**2️⃣ Second Law (F = ma):**
-"Force equals mass times acceleration."
-*Example: Pushing an empty cart is easier than a full one!*
+**3rd Law:** Every action has an equal and opposite reaction.
 
-**3️⃣ Third Law (Action-Reaction):**
-"For every action, there is an equal and opposite reaction."
-*Example: When you jump, you push Earth down, and Earth pushes you up!*
+*Example: When you push a wall, it pushes back with equal force.*`,
 
-**Pro Tip:** Remember "IFA" - Inertia, Force=ma, Action-Reaction! 🚀`,
+  'atomic': `**Atomic Structure**
 
-  'atomic': `⚛️ **Atomic Structure Explained**
-
-**The Atom consists of:**
-
-**1. Nucleus (Center)**
-• Protons (+ve charge) - determines element type
-• Neutrons (no charge) - adds mass
-
-**2. Electron Cloud (Outside)**
-• Electrons (-ve charge) - orbit the nucleus
-• Arranged in shells/energy levels
+**Components:**
+• **Protons** (+) - in nucleus
+• **Neutrons** (0) - in nucleus  
+• **Electrons** (-) - orbit nucleus
 
 **Key Numbers:**
-• Atomic Number = Number of Protons
+• Atomic Number = Protons
 • Mass Number = Protons + Neutrons
-• Neutral atom: Protons = Electrons
 
-**Shell Capacity:** 2n² (where n = shell number)
-• 1st shell: 2 electrons
-• 2nd shell: 8 electrons
-• 3rd shell: 18 electrons
+**Shell Capacity:** 2, 8, 18, 32...`,
 
-**Remember:** "PEN" - Protons, Electrons, Neutrons! 📝`,
+  'quadratic': `**Quadratic Formula**
 
-  'quadratic': `📐 **Solving Quadratic Equations**
+For ax² + bx + c = 0:
 
-**Standard Form:** ax² + bx + c = 0
+**x = (-b ± √(b² - 4ac)) / 2a**
 
-**The Quadratic Formula:**
-x = (-b ± √(b² - 4ac)) / 2a
-
-**Step-by-Step:**
-1. Identify a, b, and c from your equation
-2. Calculate the discriminant: D = b² - 4ac
-3. Plug values into the formula
-4. Solve for both + and - cases
-
-**Discriminant tells you:**
+**Discriminant (D = b² - 4ac):**
 • D > 0 → Two real solutions
-• D = 0 → One real solution
-• D < 0 → No real solutions (complex)
+• D = 0 → One solution
+• D < 0 → No real solutions`,
 
-**Example:** x² - 5x + 6 = 0
-a=1, b=-5, c=6
-x = (5 ± √(25-24))/2 = (5 ± 1)/2
-x = 3 or x = 2 ✓`,
+  'cell': `**Cell Structure**
 
-  'water cycle': `💧 **The Water Cycle (Hydrological Cycle)**
-
-**Four Main Stages:**
-
-**1. Evaporation ☀️**
-• Sun heats water in oceans, lakes, rivers
-• Water turns from liquid to vapor
-• Rises into the atmosphere
-
-**2. Condensation ☁️**
-• Water vapor cools in atmosphere
-• Forms tiny droplets around dust particles
-• Creates clouds and fog
-
-**3. Precipitation 🌧️**
-• Droplets combine and get heavy
-• Fall as rain, snow, sleet, or hail
-• Returns water to Earth's surface
-
-**4. Collection 🌊**
-• Water collects in oceans, lakes, rivers
-• Some seeps into groundwater
-• Cycle repeats!
-
-**Fun Fact:** The water you drink today could be millions of years old! 🌍`,
-
-  'cell': `🔬 **Cell Structure - The Building Block of Life**
-
-**Two Types of Cells:**
-
-**1. Prokaryotic** (Bacteria)
-• No nucleus
-• Simple structure
-• Smaller size
-
-**2. Eukaryotic** (Plants, Animals, Fungi)
-• Has nucleus
-• Complex organelles
-• Larger size
+**Prokaryotic** (bacteria): No nucleus, simple
+**Eukaryotic** (plants/animals): Has nucleus, complex
 
 **Key Organelles:**
-• **Nucleus** 🧠 - Control center, contains DNA
-• **Mitochondria** ⚡ - Powerhouse, produces ATP
-• **Ribosomes** 🏭 - Protein factories
-• **Endoplasmic Reticulum** - Transport system
-• **Golgi Body** 📦 - Packaging and shipping
-• **Cell Membrane** 🛡️ - Protective boundary
+• Nucleus - Control center
+• Mitochondria - Energy production
+• Ribosomes - Protein synthesis
+• ER - Transport system`,
 
-**Plant cells also have:**
-• Cell Wall - Extra protection
-• Chloroplasts - For photosynthesis
-• Large Vacuole - Storage`,
-
-  'exam': `📚 **Ultimate Exam Preparation Tips**
-
-**Before the Exam:**
-✅ Create a study schedule (start 2 weeks early)
-✅ Break topics into small chunks
-✅ Use active recall - test yourself!
-✅ Make flashcards for key concepts
-✅ Teach concepts to someone else
+  'exam': `**Exam Preparation Tips**
 
 **Study Techniques:**
-📌 **Pomodoro Method:** 25 min study + 5 min break
-📌 **Spaced Repetition:** Review at increasing intervals
-📌 **Mind Maps:** Visual connections between topics
-📌 **Past Papers:** Practice with real exam questions
+• Use Pomodoro (25 min work, 5 min break)
+• Practice past papers
+• Teach concepts to others
+• Use spaced repetition
 
-**Night Before:**
-• Light revision only - no new topics
-• Pack your bag
-• Get 7-8 hours of sleep 😴
+**Before Exam:**
+• Sleep 7-8 hours
+• Eat healthy breakfast
+• Arrive early, stay calm`,
 
-**Exam Day:**
-• Eat a healthy breakfast
-• Arrive early
-• Read all questions first
-• Start with easy questions
+  'derivative': `**Derivatives in Calculus**
 
-**Remember:** Confidence is key! You've prepared well! 💪`,
-
-  'periodic': `🧪 **Periodic Table Overview**
-
-**Organization:**
-• **Periods** (Rows): 7 horizontal rows
-• **Groups** (Columns): 18 vertical columns
-
-**Key Groups:**
-• **Group 1** - Alkali Metals (Li, Na, K...) - Very reactive
-• **Group 2** - Alkaline Earth Metals (Mg, Ca...)
-• **Group 17** - Halogens (F, Cl, Br...) - Reactive non-metals
-• **Group 18** - Noble Gases (He, Ne, Ar...) - Unreactive
-
-**Trends:**
-→ Across a period (left to right):
-  • Atomic size decreases
-  • Electronegativity increases
-
-↓ Down a group (top to bottom):
-  • Atomic size increases
-  • Reactivity varies
-
-**Mnemonic for first 20:**
-"H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca"
-*"Happy Henry Likes Beer But Could Not Obtain Food Naturally..."*`,
-
-  'derivative': `📈 **Derivatives in Calculus**
-
-**What is a Derivative?**
-The rate of change of a function - basically, how fast something is changing!
-
-**Basic Rules:**
-
-**1. Power Rule:**
-d/dx(xⁿ) = n·xⁿ⁻¹
-
-**2. Constant Rule:**
-d/dx(c) = 0
-
-**3. Sum Rule:**
-d/dx(f + g) = f' + g'
-
-**4. Product Rule:**
-d/dx(f·g) = f'g + fg'
-
-**5. Quotient Rule:**
-d/dx(f/g) = (f'g - fg')/g²
+**Power Rule:** d/dx(xⁿ) = n·xⁿ⁻¹
 
 **Common Derivatives:**
 • d/dx(x²) = 2x
-• d/dx(x³) = 3x²
 • d/dx(sin x) = cos x
 • d/dx(eˣ) = eˣ
 
-**Remember:** Derivatives = Slopes of tangent lines! 📐`,
+**Product Rule:** (fg)' = f'g + fg'`,
 
-  'hindi': `मैं हिंदी में भी मदद कर सकता हूं! 🙏
+  'periodic': `**Periodic Table**
 
-यहां कुछ उपयोगी study tips हैं:
+**Groups (Columns):**
+• Group 1 - Alkali Metals (reactive)
+• Group 17 - Halogens
+• Group 18 - Noble Gases (stable)
 
-1. **नियमित अध्ययन** - रोज़ 2-3 घंटे पढ़ाई करें
-2. **Notes बनाएं** - अपने शब्दों में लिखें
-3. **Revision** - हर हफ्ते पुराने topics दोहराएं
-4. **Questions Practice** - Previous year papers solve करें
+**Trends:**
+• Left→Right: Size ↓, Electronegativity ↑
+• Top→Bottom: Size ↑`,
 
-किसी भी subject में help चाहिए तो पूछें! 📚`,
+  'integration': `**Integration Basics**
 
-  'tamil': `நான் தமிழிலும் உதவ முடியும்! 🙏
+**Power Rule:** ∫xⁿ dx = xⁿ⁺¹/(n+1) + C
 
-படிப்பதற்கான சில tips:
-• தினமும் 2-3 மணி நேரம் படியுங்கள்
-• குறிப்புகள் எழுதுங்கள்
-• வாராந்திர revision செய்யுங்கள்
+**Common Integrals:**
+• ∫eˣ dx = eˣ + C
+• ∫sin x dx = -cos x + C
+• ∫1/x dx = ln|x| + C
 
-எந்த subject-லும் doubt இருந்தால் கேளுங்கள்! 📚`,
+*Always add constant C!*`,
+
+  'water cycle': `**Water Cycle**
+
+**4 Stages:**
+1. **Evaporation** - Sun heats water → vapor
+2. **Condensation** - Vapor cools → clouds
+3. **Precipitation** - Rain, snow, hail
+4. **Collection** - Water returns to oceans/lakes
+
+*Cycle repeats continuously!*`,
 };
 
-// Function to get AI response based on query
-const getAiResponse = (query: string): string => {
+const getAiResponse = (query: string, hasMedia: boolean = false): string => {
   const q = query.toLowerCase();
+  
+  // Check for media acknowledgment
+  if (hasMedia) {
+    const mediaResponse = "I can see the file you've shared. ";
+    
+    // Check if there's also a text query
+    for (const [key, response] of Object.entries(aiKnowledgeBase)) {
+      if (q.includes(key)) {
+        return mediaResponse + "Based on your question:\n\n" + response;
+      }
+    }
+    
+    return mediaResponse + "I've analyzed this content. What specific questions do you have about it? I can help explain concepts, solve problems, or provide study tips related to what you've shared.";
+  }
   
   // Check for specific topics
   for (const [key, response] of Object.entries(aiKnowledgeBase)) {
@@ -273,228 +160,366 @@ const getAiResponse = (query: string): string => {
 
   // General patterns
   if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-    return "Hello! 👋 I'm your AI study buddy. I can help you with:\n\n📚 **Subjects:** Physics, Chemistry, Biology, Math\n💡 **Study Tips:** Exam prep, time management\n🌐 **Languages:** English, Hindi, Tamil\n\nWhat would you like to learn today?";
+    return "Hi! I'm your AI study companion. I can help with Physics, Chemistry, Biology, Math, and study tips. What would you like to learn?";
   }
 
   if (q.includes('thank')) {
-    return "You're welcome! 😊 Happy to help! Keep studying and feel free to ask me anything else. Good luck with your exams! 🌟";
+    return "You're welcome! Feel free to ask anything else. Good luck with your studies!";
   }
 
-  if (q.includes('what') && q.includes('you')) {
-    return "I'm MotiMate AI - your personal study companion! 🤖\n\nI can help you with:\n• Explaining difficult concepts\n• Solving math problems\n• Exam preparation tips\n• Regional language support (Hindi, Tamil)\n• Creating study notes\n\nJust ask me anything about your studies!";
+  if (q.includes('formula')) {
+    return "**Key Formulas:**\n\n**Physics:** F=ma, v=u+at, E=mc²\n**Chemistry:** PV=nRT, n=m/M\n**Math:** (a+b)²=a²+2ab+b²\n\nWhich subject do you need more formulas for?";
   }
 
-  if (q.includes('calculus') || q.includes('integrate') || q.includes('integral')) {
-    return "📐 **Integration Basics**\n\n**What is Integration?**\nThe reverse of differentiation - finding the area under a curve!\n\n**Basic Rules:**\n• ∫xⁿ dx = xⁿ⁺¹/(n+1) + C\n• ∫eˣ dx = eˣ + C\n• ∫sin x dx = -cos x + C\n• ∫cos x dx = sin x + C\n\n**Remember:** Always add the constant 'C' for indefinite integrals!\n\nWant me to solve a specific integral? 🎯";
-  }
-
-  if (q.includes('formula') || q.includes('formulas')) {
-    return "📝 **Important Formulas**\n\n**Physics:**\n• F = ma (Force)\n• v = u + at (Velocity)\n• s = ut + ½at² (Displacement)\n• E = mc² (Energy)\n\n**Chemistry:**\n• n = m/M (Moles)\n• PV = nRT (Ideal Gas)\n\n**Math:**\n• (a+b)² = a² + 2ab + b²\n• sin²θ + cos²θ = 1\n\nWhich subject formulas do you need? 🎯";
-  }
-
-  // Default response with helpful suggestions
-  return "I'd be happy to help you with that! 🤔\n\nCould you please be more specific? Here are some things I can help with:\n\n📚 **Subjects:** Physics, Chemistry, Biology, Mathematics\n📝 **Topics:** Atomic structure, Newton's laws, Photosynthesis, Calculus\n💡 **Study Help:** Exam tips, formulas, problem solving\n\nJust ask about any topic and I'll explain it in simple terms!";
+  return "I'd be happy to help! Could you be more specific? I can explain:\n\n• Physics, Chemistry, Biology, Math topics\n• Problem solving techniques\n• Exam preparation tips\n\nJust ask about any topic!";
 };
 
+const suggestions = [
+  "Explain photosynthesis",
+  "Newton's laws of motion", 
+  "How to solve quadratic equations",
+  "Tips for exam preparation",
+];
+
 export default function AiTutorScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'bot',
-      text: "Hello! 👋 I'm your AI study buddy, MotiMate!\n\nI can help you with:\n• 📚 Subject explanations (Physics, Chemistry, Bio, Math)\n• 💡 Exam preparation tips\n• 🔢 Problem solving\n• 🌐 Regional language support\n\nTry clicking on a suggestion below or ask me anything!",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [attachedMedia, setAttachedMedia] = useState<MediaFile[]>([]);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [input]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAttachedMedia(prev => [...prev, {
+            id: Date.now().toString() + Math.random(),
+            type,
+            url: reader.result as string,
+            name: file.name
+          }]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    setShowMediaOptions(false);
+  };
+
+  const removeMedia = (id: string) => {
+    setAttachedMedia(prev => prev.filter(m => m.id !== id));
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() && attachedMedia.length === 0) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       text: input,
+      media: attachedMedia.length > 0 ? [...attachedMedia] : undefined,
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
+    const hadMedia = attachedMedia.length > 0;
     setInput('');
+    setAttachedMedia([]);
     setIsTyping(true);
 
-    // Simulate typing delay
+    // Simulate AI response
     setTimeout(() => {
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        text: getAiResponse(input),
+        text: getAiResponse(currentInput, hadMedia),
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botResponse]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }, 800 + Math.random() * 800);
   };
 
   const handleSuggestion = (text: string) => {
     setInput(text);
+    textareaRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   return (
     <AppLayout>
-      <div className="flex flex-col h-screen lg:h-auto lg:min-h-screen">
-        {/* Header */}
-        <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-lg border-b border-border px-4 py-3">
-          <div className="flex items-center gap-3">
-            <motion.img
-              src={aiTutorAvatar}
-              alt="AI Tutor"
-              className="w-10 h-10 object-contain"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-            <div>
-              <h1 className="font-bold">MotiMate AI</h1>
-              <p className="text-xs text-success flex items-center gap-1">
-                <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                Online - Ready to help!
-              </p>
+      <div className="flex flex-col h-screen lg:h-[calc(100vh-2rem)]">
+        {/* Minimal Header */}
+        <header className="flex items-center justify-center py-3 border-b border-border bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center">
+              <Sparkles size={16} className="text-primary-foreground" />
             </div>
+            <span className="font-semibold text-foreground">MotiMate AI</span>
           </div>
         </header>
 
-        {/* Chat messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-36 lg:pb-24">
-          {/* AI Avatar intro */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center py-4"
-          >
-            <motion.img
-              src={aiTutorAvatar}
-              alt="AI Tutor"
-              className="w-28 h-28 object-contain mb-2"
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-            />
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={16} className="text-primary" />
-              <h3 className="font-bold text-lg">MotiMate AI</h3>
-              <Sparkles size={16} className="text-primary" />
-            </div>
-            <p className="text-sm text-muted-foreground">Your personal study companion</p>
-          </motion.div>
-
-          {/* Suggestions */}
-          {messages.length === 1 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-2 gap-2 mb-4"
-            >
-              {suggestionCategories.map((suggestion, index) => (
-                <motion.button
-                  key={index}
-                  onClick={() => handleSuggestion(suggestion.text)}
-                  className="flex items-center gap-2 px-3 py-3 rounded-xl bg-card border border-border text-left hover:border-primary transition-colors"
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <suggestion.icon size={16} className="text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{suggestion.category}</p>
-                    <p className="text-sm font-medium truncate">{suggestion.text}</p>
-                  </div>
-                </motion.button>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Messages */}
-          <AnimatePresence>
-            {messages.map((message) => (
+        {/* Chat Area */}
+        <ScrollArea className="flex-1 px-4">
+          <div className="max-w-2xl mx-auto py-6 space-y-6">
+            {/* Empty State with Suggestions */}
+            {messages.length === 0 && (
               <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4"
               >
-                {message.type === 'bot' && (
-                  <img
-                    src={aiTutorAvatar}
-                    alt="AI"
-                    className="w-8 h-8 rounded-full mr-2 flex-shrink-0"
-                  />
-                )}
-                <div
-                  className={`${message.type === 'user' ? 'chat-bubble-user' : 'chat-bubble-bot'} max-w-[85%]`}
-                >
-                  <p className="whitespace-pre-line text-sm leading-relaxed">{message.text}</p>
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center mb-4">
+                  <Sparkles size={28} className="text-primary-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">How can I help you study?</h2>
+                <p className="text-muted-foreground text-sm mb-8 max-w-sm">
+                  Ask questions, upload study materials, or get help with any subject.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+                  {suggestions.map((suggestion, i) => (
+                    <motion.button
+                      key={i}
+                      onClick={() => handleSuggestion(suggestion)}
+                      className="p-3 text-sm text-left rounded-xl border border-border hover:border-primary hover:bg-card transition-all"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                    >
+                      {suggestion}
+                    </motion.button>
+                  ))}
                 </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
+            )}
 
-          {/* Typing indicator */}
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-2"
-            >
-              <img
-                src={aiTutorAvatar}
-                alt="AI"
-                className="w-8 h-8 rounded-full"
-              />
-              <div className="chat-bubble-bot flex gap-1.5 py-3 px-4">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full bg-primary"
-                    animate={{ y: [0, -6, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                  />
+            {/* Messages */}
+            <AnimatePresence>
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[85%] lg:max-w-[70%] ${message.type === 'user' ? 'order-2' : ''}`}>
+                    {/* Media Preview */}
+                    {message.media && message.media.length > 0 && (
+                      <div className={`flex flex-wrap gap-2 mb-2 ${message.type === 'user' ? 'justify-end' : ''}`}>
+                        {message.media.map(m => (
+                          <div key={m.id} className="relative">
+                            {m.type === 'image' ? (
+                              <img 
+                                src={m.url} 
+                                alt={m.name}
+                                className="max-w-[200px] max-h-[150px] rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                                <FileText size={16} />
+                                <span className="text-xs truncate max-w-[100px]">{m.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Message Text */}
+                    {message.text && (
+                      <div
+                        className={`px-4 py-3 rounded-2xl ${
+                          message.type === 'user'
+                            ? 'bg-primary text-primary-foreground rounded-br-md'
+                            : 'bg-card border border-border rounded-bl-md'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-line leading-relaxed">{message.text}</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Typing Indicator */}
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex justify-start"
+              >
+                <div className="bg-card border border-border rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-muted-foreground"
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="border-t border-border bg-background p-4 pb-20 lg:pb-4">
+          <div className="max-w-2xl mx-auto">
+            {/* Attached Media Preview */}
+            {attachedMedia.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {attachedMedia.map(m => (
+                  <div key={m.id} className="relative group">
+                    {m.type === 'image' ? (
+                      <img 
+                        src={m.url} 
+                        alt={m.name}
+                        className="w-16 h-16 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                        <FileText size={14} />
+                        <span className="text-xs truncate max-w-[80px]">{m.name}</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removeMedia(m.id)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ))}
               </div>
-            </motion.div>
-          )}
+            )}
 
-          <div ref={messagesEndRef} />
-        </div>
+            {/* Input Container */}
+            <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl p-2">
+              {/* Media Button */}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl"
+                  onClick={() => setShowMediaOptions(!showMediaOptions)}
+                >
+                  <Plus size={20} className="text-muted-foreground" />
+                </Button>
 
-        {/* Input area */}
-        <div className="fixed bottom-20 lg:bottom-0 left-0 right-0 lg:relative lg:mt-auto px-4 pb-4 pt-2 bg-gradient-to-t from-background via-background to-transparent lg:from-transparent lg:border-t lg:border-border lg:bg-card">
-          <div className="max-w-md mx-auto lg:max-w-none flex items-center gap-2 bg-card rounded-2xl p-2 shadow-card border border-border">
-            <button className="p-2.5 rounded-full hover:bg-muted transition-colors">
-              <Mic size={20} className="text-muted-foreground" />
-            </button>
-            <input
-              type="text"
-              placeholder="Ask me anything..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              className="flex-1 bg-transparent outline-none text-sm py-2"
-            />
-            <motion.button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="p-2.5 rounded-full bg-primary text-primary-foreground disabled:opacity-50"
-              whileTap={{ scale: 0.9 }}
-            >
-              <Send size={18} />
-            </motion.button>
+                {/* Media Options Popup */}
+                <AnimatePresence>
+                  {showMediaOptions && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute bottom-12 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50"
+                    >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => handleFileSelect(e, 'image')}
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full"
+                      >
+                        <Image size={18} className="text-primary" />
+                        <span className="text-sm">Upload Image</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = '.pdf,.doc,.docx,.txt';
+                          input.multiple = true;
+                          input.onchange = (e) => handleFileSelect(e as any, 'document');
+                          input.click();
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full border-t border-border"
+                      >
+                        <FileText size={18} className="text-primary" />
+                        <span className="text-sm">Upload Document</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Camera capture
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.capture = 'environment';
+                          input.onchange = (e) => handleFileSelect(e as any, 'image');
+                          input.click();
+                          setShowMediaOptions(false);
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full border-t border-border"
+                      >
+                        <Camera size={18} className="text-primary" />
+                        <span className="text-sm">Take Photo</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Text Input */}
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask anything..."
+                className="flex-1 bg-transparent border-none resize-none text-sm placeholder:text-muted-foreground focus:outline-none py-2 px-2 max-h-32"
+                rows={1}
+              />
+
+              {/* Send Button */}
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() && attachedMedia.length === 0}
+                size="icon"
+                className="h-9 w-9 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40"
+              >
+                <Send size={16} />
+              </Button>
+            </div>
+
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              AI can make mistakes. Verify important information.
+            </p>
           </div>
         </div>
       </div>
