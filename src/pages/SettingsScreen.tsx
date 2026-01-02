@@ -16,7 +16,7 @@ export default function SettingsScreen() {
       items: [
         { icon: theme === 'dark' ? Moon : Sun, label: 'Dark Mode', action: 'toggle', value: theme === 'dark' },
         { icon: Bell, label: 'Notifications', action: 'navigate', path: '/notifications' },
-        { icon: Globe, label: 'Language', action: 'navigate', value: 'English' },
+        { icon: Globe, label: 'Language', action: 'navigate', path: '/language', value: 'English' },
       ],
     },
     {
