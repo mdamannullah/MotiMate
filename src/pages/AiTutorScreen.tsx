@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Send, Paperclip, Mic, X, Image, FileText, Camera, Sparkles, Plus } from 'lucide-react';
+import { Send, Paperclip, Mic, MicOff, X, Image, FileText, Camera, Sparkles, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { toast } from 'sonner';
 
 interface MediaFile {
   id: string;
@@ -132,35 +134,69 @@ For ax² + bx + c = 0:
 4. **Collection** - Water returns to oceans/lakes
 
 *Cycle repeats continuously!*`,
+
+  'machine learning': `**Machine Learning Basics**
+
+**Types:**
+• **Supervised Learning** - Labeled data (classification, regression)
+• **Unsupervised Learning** - No labels (clustering, dimensionality reduction)
+• **Reinforcement Learning** - Learn from rewards
+
+**Key Algorithms:**
+• Linear/Logistic Regression
+• Decision Trees
+• Neural Networks
+• SVM, K-means`,
+
+  'data structure': `**Data Structures**
+
+**Linear:**
+• Arrays - Fixed size, O(1) access
+• Linked Lists - Dynamic, O(n) access
+• Stacks - LIFO
+• Queues - FIFO
+
+**Non-Linear:**
+• Trees - Hierarchical
+• Graphs - Connected nodes
+• Hash Tables - O(1) average lookup`,
+
+  'algorithm': `**Algorithm Complexity**
+
+**Big O Notation:**
+• O(1) - Constant
+• O(log n) - Logarithmic  
+• O(n) - Linear
+• O(n log n) - Linearithmic
+• O(n²) - Quadratic
+
+**Common Algorithms:**
+• Binary Search - O(log n)
+• QuickSort - O(n log n) avg
+• BFS/DFS - O(V + E)`,
 };
 
 const getAiResponse = (query: string, hasMedia: boolean = false): string => {
   const q = query.toLowerCase();
   
-  // Check for media acknowledgment
   if (hasMedia) {
     const mediaResponse = "I can see the file you've shared. ";
-    
-    // Check if there's also a text query
     for (const [key, response] of Object.entries(aiKnowledgeBase)) {
       if (q.includes(key)) {
         return mediaResponse + "Based on your question:\n\n" + response;
       }
     }
-    
-    return mediaResponse + "I've analyzed this content. What specific questions do you have about it? I can help explain concepts, solve problems, or provide study tips related to what you've shared.";
+    return mediaResponse + "I've analyzed this content. What specific questions do you have about it?";
   }
   
-  // Check for specific topics
   for (const [key, response] of Object.entries(aiKnowledgeBase)) {
     if (q.includes(key)) {
       return response;
     }
   }
 
-  // General patterns
   if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-    return "Hi! I'm your AI study companion. I can help with Physics, Chemistry, Biology, Math, and study tips. What would you like to learn?";
+    return "Hi! I'm your AI study companion. I can help with Physics, Chemistry, Biology, Math, CS, and study tips. What would you like to learn?";
   }
 
   if (q.includes('thank')) {
@@ -171,7 +207,7 @@ const getAiResponse = (query: string, hasMedia: boolean = false): string => {
     return "**Key Formulas:**\n\n**Physics:** F=ma, v=u+at, E=mc²\n**Chemistry:** PV=nRT, n=m/M\n**Math:** (a+b)²=a²+2ab+b²\n\nWhich subject do you need more formulas for?";
   }
 
-  return "I'd be happy to help! Could you be more specific? I can explain:\n\n• Physics, Chemistry, Biology, Math topics\n• Problem solving techniques\n• Exam preparation tips\n\nJust ask about any topic!";
+  return "I'd be happy to help! Could you be more specific? I can explain:\n\n• Physics, Chemistry, Biology, Math topics\n• Data Structures & Algorithms\n• Machine Learning concepts\n• Problem solving techniques\n• Exam preparation tips\n\nJust ask about any topic!";
 };
 
 const suggestions = [
@@ -191,6 +227,15 @@ export default function AiTutorScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const { 
+    isListening, 
+    transcript, 
+    error: speechError, 
+    startListening, 
+    stopListening, 
+    isSupported: speechSupported 
+  } = useSpeechRecognition();
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -202,6 +247,20 @@ export default function AiTutorScreen() {
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
     }
   }, [input]);
+
+  // Update input when speech transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setInput(prev => prev + (prev ? ' ' : '') + transcript);
+    }
+  }, [transcript]);
+
+  // Show speech error
+  useEffect(() => {
+    if (speechError) {
+      toast.error(speechError);
+    }
+  }, [speechError]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
     const files = e.target.files;
@@ -224,6 +283,20 @@ export default function AiTutorScreen() {
 
   const removeMedia = (id: string) => {
     setAttachedMedia(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleVoiceInput = () => {
+    if (!speechSupported) {
+      toast.error('Voice input is not supported in your browser. Try Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+      toast.info('Listening... Speak now');
+    }
   };
 
   const handleSend = async () => {
@@ -297,7 +370,7 @@ export default function AiTutorScreen() {
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">How can I help you study?</h2>
                 <p className="text-muted-foreground text-sm mb-8 max-w-sm">
-                  Ask questions, upload study materials, or get help with any subject.
+                  Ask questions, upload study materials, or use voice input.
                 </p>
                 
                 <div className="grid grid-cols-2 gap-2 w-full max-w-md">
@@ -395,6 +468,23 @@ export default function AiTutorScreen() {
         {/* Input Area */}
         <div className="border-t border-border bg-background p-4 pb-20 lg:pb-4">
           <div className="max-w-2xl mx-auto">
+            {/* Listening Indicator */}
+            {isListening && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 mb-3 p-3 bg-primary/10 rounded-xl"
+              >
+                <motion.div
+                  className="w-3 h-3 rounded-full bg-primary"
+                  animate={{ scale: [1, 1.3, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
+                <span className="text-sm text-primary font-medium">Listening...</span>
+                <span className="text-sm text-muted-foreground flex-1">{transcript || 'Speak now'}</span>
+              </motion.div>
+            )}
+
             {/* Attached Media Preview */}
             {attachedMedia.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
@@ -476,7 +566,6 @@ export default function AiTutorScreen() {
                       </button>
                       <button
                         onClick={() => {
-                          // Camera capture
                           const input = document.createElement('input');
                           input.type = 'file';
                           input.accept = 'image/*';
@@ -505,6 +594,16 @@ export default function AiTutorScreen() {
                 className="flex-1 bg-transparent border-none resize-none text-sm placeholder:text-muted-foreground focus:outline-none py-2 px-2 max-h-32"
                 rows={1}
               />
+
+              {/* Voice Input Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-9 w-9 rounded-xl ${isListening ? 'bg-primary/20 text-primary' : ''}`}
+                onClick={handleVoiceInput}
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} className="text-muted-foreground" />}
+              </Button>
 
               {/* Send Button */}
               <Button

@@ -1,53 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { MotiCard } from '@/components/ui/MotiCard';
 import { Check, Globe, Search } from 'lucide-react';
 import { toast } from 'sonner';
-
-// All Indian languages
-const languages = [
-  { code: 'en', name: 'English', native: 'English', region: 'International' },
-  { code: 'hi', name: 'Hindi', native: 'हिन्दी', region: 'North India' },
-  { code: 'ta', name: 'Tamil', native: 'தமிழ்', region: 'Tamil Nadu' },
-  { code: 'te', name: 'Telugu', native: 'తెలుగు', region: 'Andhra Pradesh, Telangana' },
-  { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ', region: 'Karnataka' },
-  { code: 'ml', name: 'Malayalam', native: 'മലയാളം', region: 'Kerala' },
-  { code: 'mr', name: 'Marathi', native: 'मराठी', region: 'Maharashtra' },
-  { code: 'bn', name: 'Bengali', native: 'বাংলা', region: 'West Bengal' },
-  { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', region: 'Gujarat' },
-  { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', region: 'Punjab' },
-  { code: 'or', name: 'Odia', native: 'ଓଡ଼ିଆ', region: 'Odisha' },
-  { code: 'as', name: 'Assamese', native: 'অসমীয়া', region: 'Assam' },
-  { code: 'ur', name: 'Urdu', native: 'اردو', region: 'Multiple States' },
-  { code: 'ks', name: 'Kashmiri', native: 'कॉशुर', region: 'Jammu & Kashmir' },
-  { code: 'sd', name: 'Sindhi', native: 'سنڌي', region: 'Multiple States' },
-  { code: 'ne', name: 'Nepali', native: 'नेपाली', region: 'Sikkim, West Bengal' },
-  { code: 'kok', name: 'Konkani', native: 'कोंकणी', region: 'Goa' },
-  { code: 'mai', name: 'Maithili', native: 'मैथिली', region: 'Bihar' },
-  { code: 'sat', name: 'Santali', native: 'ᱥᱟᱱᱛᱟᱲᱤ', region: 'Jharkhand' },
-  { code: 'doi', name: 'Dogri', native: 'डोगरी', region: 'Jammu' },
-  { code: 'mni', name: 'Manipuri', native: 'মৈতৈলোন্', region: 'Manipur' },
-  { code: 'bo', name: 'Bodo', native: 'बड़ो', region: 'Assam' },
-];
+import { useLanguage, languages } from '@/contexts/LanguageContext';
 
 export default function LanguageSettingsScreen() {
   const navigate = useNavigate();
-  const [selectedLang, setSelectedLang] = useState('en');
+  const { language, setLanguage } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    const saved = localStorage.getItem('motimate_language');
-    if (saved) setSelectedLang(saved);
-  }, []);
-
   const handleSelectLanguage = (code: string) => {
-    setSelectedLang(code);
-    localStorage.setItem('motimate_language', code);
+    setLanguage(code);
     const lang = languages.find(l => l.code === code);
     toast.success(`Language changed to ${lang?.name}`);
-    // In a real app, this would trigger i18n language change
   };
 
   const filteredLanguages = languages.filter(
@@ -81,7 +49,7 @@ export default function LanguageSettingsScreen() {
             <div>
               <p className="font-medium text-sm">App Language</p>
               <p className="text-xs text-muted-foreground">
-                Changing the language will update all text in the app to the selected language.
+                Changing the language will update navigation labels and common UI elements.
               </p>
             </div>
           </div>
@@ -104,7 +72,7 @@ export default function LanguageSettingsScreen() {
                   </div>
                   <p className="text-xs text-muted-foreground">{lang.region}</p>
                 </div>
-                {selectedLang === lang.code && (
+                {language === lang.code && (
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
