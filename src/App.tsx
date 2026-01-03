@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { DataProvider } from "@/contexts/DataContext";
 
 import SplashScreen from "./pages/SplashScreen";
@@ -40,45 +41,47 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <AuthProvider>
-        <DataProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<SplashScreen />} />
-                <Route path="/onboarding" element={<OnboardingScreen />} />
-                <Route path="/home" element={<HomeScreen />} />
-                <Route path="/login" element={<LoginScreen />} />
-                <Route path="/signup" element={<SignupScreen />} />
-                <Route path="/verify-otp" element={<VerifyOtpScreen />} />
-                <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
-                <Route path="/about" element={<AboutScreen />} />
-                <Route path="/contact" element={<ContactScreen />} />
-                <Route path="/dashboard" element={<DashboardScreen />} />
-                <Route path="/ai-tutor" element={<AiTutorScreen />} />
-                <Route path="/tests" element={<TestsScreen />} />
-                <Route path="/test/:testId" element={<TakeTestScreen />} />
-                <Route path="/analytics" element={<AnalyticsScreen />} />
-                <Route path="/profile" element={<ProfileScreen />} />
-                <Route path="/settings" element={<SettingsScreen />} />
-                <Route path="/subscription" element={<SubscriptionScreen />} />
-                <Route path="/notifications" element={<NotificationsScreen />} />
-                <Route path="/change-password" element={<ChangePasswordScreen />} />
-                <Route path="/privacy-settings" element={<PrivacySettingsScreen />} />
-                <Route path="/terms" element={<TermsScreen />} />
-                <Route path="/delete-account" element={<DeleteAccountScreen />} />
-                <Route path="/live-translate" element={<LiveTranslateScreen />} />
-                <Route path="/notes" element={<NotesScreen />} />
-                <Route path="/help" element={<HelpScreen />} />
-                <Route path="/language" element={<LanguageSettingsScreen />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </DataProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <DataProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<SplashScreen />} />
+                  <Route path="/onboarding" element={<OnboardingScreen />} />
+                  <Route path="/home" element={<HomeScreen />} />
+                  <Route path="/login" element={<LoginScreen />} />
+                  <Route path="/signup" element={<SignupScreen />} />
+                  <Route path="/verify-otp" element={<VerifyOtpScreen />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+                  <Route path="/about" element={<AboutScreen />} />
+                  <Route path="/contact" element={<ContactScreen />} />
+                  <Route path="/dashboard" element={<DashboardScreen />} />
+                  <Route path="/ai-tutor" element={<AiTutorScreen />} />
+                  <Route path="/tests" element={<TestsScreen />} />
+                  <Route path="/test/:testId" element={<TakeTestScreen />} />
+                  <Route path="/analytics" element={<AnalyticsScreen />} />
+                  <Route path="/profile" element={<ProfileScreen />} />
+                  <Route path="/settings" element={<SettingsScreen />} />
+                  <Route path="/subscription" element={<SubscriptionScreen />} />
+                  <Route path="/notifications" element={<NotificationsScreen />} />
+                  <Route path="/change-password" element={<ChangePasswordScreen />} />
+                  <Route path="/privacy-settings" element={<PrivacySettingsScreen />} />
+                  <Route path="/terms" element={<TermsScreen />} />
+                  <Route path="/delete-account" element={<DeleteAccountScreen />} />
+                  <Route path="/live-translate" element={<LiveTranslateScreen />} />
+                  <Route path="/notes" element={<NotesScreen />} />
+                  <Route path="/help" element={<HelpScreen />} />
+                  <Route path="/language" element={<LanguageSettingsScreen />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </DataProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

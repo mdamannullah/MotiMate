@@ -64,6 +64,7 @@ export function AppHeader({
       <div className="flex items-center gap-1">
         {showNotification && (
           <motion.button
+            onClick={() => navigate('/notifications')}
             className="p-2 rounded-full hover:bg-muted/50 transition-colors relative"
             whileTap={{ scale: 0.9 }}
           >

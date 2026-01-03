@@ -6,6 +6,7 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function VerifyOtpScreen() {
   const navigate = useNavigate();
@@ -13,10 +14,12 @@ export default function VerifyOtpScreen() {
   const { verifyOtp, isLoading } = useAuth();
   
   const email = location.state?.email || 'user@example.com';
+  const type = location.state?.type || 'signup';
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   // Resend timer countdown
   useEffect(() => {
@@ -41,28 +44,53 @@ export default function VerifyOtpScreen() {
       return;
     }
 
+    setVerifying(true);
+    
     try {
-      const success = await verifyOtp(otp);
-      if (success) {
-        toast.success('Account verified successfully! 🎉');
-        navigate('/dashboard', { replace: true });
+      // Verify OTP via edge function
+      const { data, error: verifyError } = await supabase.functions.invoke('verify-otp', {
+        body: { email, otp }
+      });
+
+      if (verifyError) throw verifyError;
+      
+      if (data?.success) {
+        // Complete signup
+        const success = await verifyOtp(otp);
+        if (success) {
+          toast.success('Account verified successfully! 🎉');
+          navigate('/dashboard', { replace: true });
+        }
       } else {
-        setError('Invalid OTP. Please try again.');
-        toast.error('Invalid OTP');
+        setError(data?.error || 'Invalid OTP. Please try again.');
+        toast.error(data?.error || 'Invalid OTP');
       }
     } catch (error) {
+      console.error('Verify error:', error);
       setError('Verification failed. Please try again.');
+    } finally {
+      setVerifying(false);
     }
   };
 
   // Resend OTP
-  const handleResend = () => {
+  const handleResend = async () => {
     if (!canResend) return;
     
-    toast.success('OTP resent to your email!');
-    setResendTimer(60);
-    setCanResend(false);
-    setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { email, type }
+      });
+      
+      if (error) throw error;
+      
+      toast.success('OTP resent to your email!');
+      setResendTimer(60);
+      setCanResend(false);
+      setError('');
+    } catch (error) {
+      toast.error('Failed to resend OTP');
+    }
   };
 
   return (
@@ -149,7 +177,7 @@ export default function VerifyOtpScreen() {
 
       {/* Verify button */}
       <div className="px-6 pb-8">
-        <MotiButton onClick={handleVerify} size="full" loading={isLoading}>
+        <MotiButton onClick={handleVerify} size="full" loading={isLoading || verifying}>
           Verify OTP
         </MotiButton>
       </div>
