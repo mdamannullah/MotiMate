@@ -22,7 +22,7 @@ interface TestResult {
 
 interface Notification {
   id: string;
-  type: 'login' | 'signup' | 'password_change' | 'test_completed' | 'achievement' | 'reminder';
+  type: 'login' | 'signup' | 'password_change' | 'test_completed' | 'achievement' | 'reminder' | 'success' | 'info';
   title: string;
   message: string;
   timestamp: number;

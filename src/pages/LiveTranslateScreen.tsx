@@ -1,50 +1,129 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { MotiCard } from '@/components/ui/MotiCard';
 import { MotiButton } from '@/components/ui/MotiButton';
-import { Mic, MicOff, Globe, Volume2, Copy, Check, Languages } from 'lucide-react';
+import { useData } from '@/contexts/DataContext';
+import { Mic, MicOff, Globe, Volume2, Copy, Check, Languages, Save, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 
 const languages = [
-  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
-  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
-  { code: 'te', name: 'Telugu', native: 'తెలుగు' },
-  { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
-  { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
-  { code: 'mr', name: 'Marathi', native: 'मराठी' },
-  { code: 'bn', name: 'Bengali', native: 'বাংলা' },
-  { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+  { code: 'ta-IN', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'hi-IN', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'te-IN', name: 'Telugu', native: 'తెలుగు' },
+  { code: 'kn-IN', name: 'Kannada', native: 'ಕನ್ನಡ' },
+  { code: 'ml-IN', name: 'Malayalam', native: 'മലയാളം' },
+  { code: 'mr-IN', name: 'Marathi', native: 'मराठी' },
+  { code: 'bn-IN', name: 'Bengali', native: 'বাংলা' },
+  { code: 'gu-IN', name: 'Gujarati', native: 'ગુજરાતી' },
 ];
 
+// Simple translation simulation (in production, use a real translation API)
+const translateToEnglish = (text: string, sourceLang: string): string => {
+  // This is a placeholder - in production, integrate with Google Translate or similar
+  return `[Translated from ${sourceLang}]: ${text}`;
+};
+
 export default function LiveTranslateScreen() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('ta');
+  const { addNotification, incrementNotes } = useData();
+  const [selectedLang, setSelectedLang] = useState('hi-IN');
   const [originalText, setOriginalText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const { 
+    isListening, 
+    transcript, 
+    error: speechError, 
+    startListening, 
+    stopListening, 
+    isSupported
+  } = useSpeechRecognition();
+
+  // Update original text when transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setOriginalText(prev => prev + (prev ? ' ' : '') + transcript);
+    }
+  }, [transcript]);
+
+  // Show speech error
+  useEffect(() => {
+    if (speechError) {
+      toast.error(speechError);
+    }
+  }, [speechError]);
 
   const handleStartRecording = () => {
-    setIsRecording(true);
-    toast.info('Listening... Speak in your regional language');
+    if (!isSupported) {
+      toast.error('Speech recognition is not supported in your browser. Try Chrome or Edge.');
+      return;
+    }
     
-    // Simulate recording for demo
-    setTimeout(() => {
-      setOriginalText('இன்று நாம் ஒளிச்சேர்க்கை பற்றி படிப்போம். இது தாவரங்கள் சூரிய ஒளியை உணவாக மாற்றும் செயல்முறை.');
-      setTranslatedText("Today we will study about photosynthesis. This is the process by which plants convert sunlight into food.");
-      setIsRecording(false);
-    }, 3000);
+    setOriginalText('');
+    setTranslatedText('');
+    startListening();
+    toast.info('Listening... Speak in your selected language');
   };
 
   const handleStopRecording = () => {
-    setIsRecording(false);
+    stopListening();
+    
+    if (originalText) {
+      setIsProcessing(true);
+      // Simulate translation processing
+      setTimeout(() => {
+        const langName = languages.find(l => l.code === selectedLang)?.name || 'Unknown';
+        setTranslatedText(translateToEnglish(originalText, langName));
+        setIsProcessing(false);
+        toast.success('Translation complete!');
+      }, 1000);
+    }
   };
 
   const handleCopy = () => {
+    if (!translatedText) return;
     navigator.clipboard.writeText(translatedText);
     setCopied(true);
     toast.success('Copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSaveAsNote = () => {
+    if (!translatedText) return;
+    
+    // Save to notes
+    const notes = JSON.parse(localStorage.getItem('motimate_notes') || '[]');
+    const newNote = {
+      id: Date.now().toString(),
+      title: `Translation - ${new Date().toLocaleDateString()}`,
+      subject: 'Translation',
+      content: `Original (${languages.find(l => l.code === selectedLang)?.name}):\n${originalText}\n\nEnglish Translation:\n${translatedText}`,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now(),
+    };
+    notes.unshift(newNote);
+    localStorage.setItem('motimate_notes', JSON.stringify(notes));
+    
+    incrementNotes();
+    addNotification({
+      title: 'Note Saved',
+      message: 'Your translation has been saved to notes!',
+      type: 'achievement'
+    });
+    
+    toast.success('Translation saved as note! 📝');
+  };
+
+  const handleSpeak = (text: string, lang: string = 'en-US') => {
+    if (!text) return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    window.speechSynthesis.speak(utterance);
+    toast.info('Playing audio...');
   };
 
   return (
@@ -52,7 +131,7 @@ export default function LiveTranslateScreen() {
       <div className="px-4 py-4 lg:px-8 space-y-6 pb-24 lg:pb-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-2xl font-bold mb-2">Live Translation</h1>
-          <p className="text-muted-foreground">Translate lectures in real-time</p>
+          <p className="text-muted-foreground">Translate lectures in real-time using voice</p>
         </motion.div>
 
         {/* Language Selection */}
@@ -66,11 +145,12 @@ export default function LiveTranslateScreen() {
               <button
                 key={lang.code}
                 onClick={() => setSelectedLang(lang.code)}
-                className={`p-2 rounded-xl text-center transition-colors ${
+                disabled={isListening}
+                className={`p-2 rounded-xl text-center transition-all ${
                   selectedLang === lang.code
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted hover:bg-muted/80'
-                }`}
+                } ${isListening ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <p className="text-xs font-medium">{lang.name}</p>
                 <p className="text-xs opacity-70">{lang.native}</p>
@@ -82,23 +162,30 @@ export default function LiveTranslateScreen() {
         {/* Recording Section */}
         <MotiCard delay={0.2} className="text-center py-8">
           <motion.button
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            onClick={isListening ? handleStopRecording : handleStartRecording}
+            disabled={isProcessing}
             className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors ${
-              isRecording ? 'bg-destructive' : 'bg-primary'
-            }`}
-            animate={isRecording ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 1, repeat: isRecording ? Infinity : 0 }}
+              isListening ? 'bg-destructive' : 'bg-primary'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            animate={isListening ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 1, repeat: isListening ? Infinity : 0 }}
           >
-            {isRecording ? (
-              <MicOff size={36} className="text-white" />
+            {isListening ? (
+              <StopCircle size={36} className="text-white" />
             ) : (
               <Mic size={36} className="text-white" />
             )}
           </motion.button>
+          
           <p className="text-muted-foreground">
-            {isRecording ? 'Tap to stop recording...' : 'Tap to start translation'}
+            {isProcessing 
+              ? 'Processing translation...' 
+              : isListening 
+                ? 'Tap to stop and translate...' 
+                : 'Tap to start speaking'}
           </p>
-          {isRecording && (
+          
+          {isListening && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -114,17 +201,56 @@ export default function LiveTranslateScreen() {
               ))}
             </motion.div>
           )}
+          
+          {!isSupported && (
+            <p className="text-sm text-destructive mt-4">
+              Voice recognition is not supported in your browser. Please use Chrome or Edge.
+            </p>
+          )}
         </MotiCard>
 
+        {/* Live Transcript */}
+        {(isListening || originalText) && (
+          <MotiCard delay={0.25}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Mic size={18} className="text-primary" />
+                <h3 className="font-semibold">Live Transcript</h3>
+                {isListening && (
+                  <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-1 rounded-full">
+                    <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                    Recording
+                  </span>
+                )}
+              </div>
+              <button 
+                onClick={() => handleSpeak(originalText, selectedLang)}
+                className="p-2 hover:bg-muted rounded-lg"
+                disabled={!originalText}
+              >
+                <Volume2 size={18} className="text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-muted-foreground leading-relaxed min-h-[60px]">
+              {originalText || (isListening ? 'Listening...' : 'No speech detected')}
+            </p>
+          </MotiCard>
+        )}
+
         {/* Original Text */}
-        {originalText && (
+        {originalText && !isListening && (
           <MotiCard delay={0.3}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Globe size={18} className="text-primary" />
-                <h3 className="font-semibold">Original</h3>
+                <h3 className="font-semibold">
+                  Original ({languages.find(l => l.code === selectedLang)?.name})
+                </h3>
               </div>
-              <button className="p-2 hover:bg-muted rounded-lg">
+              <button 
+                onClick={() => handleSpeak(originalText, selectedLang)}
+                className="p-2 hover:bg-muted rounded-lg"
+              >
                 <Volume2 size={18} className="text-muted-foreground" />
               </button>
             </div>
@@ -140,21 +266,29 @@ export default function LiveTranslateScreen() {
                 <Languages size={18} className="text-success" />
                 <h3 className="font-semibold text-success">English Translation</h3>
               </div>
-              <button onClick={handleCopy} className="p-2 hover:bg-muted rounded-lg">
-                {copied ? (
-                  <Check size={18} className="text-success" />
-                ) : (
-                  <Copy size={18} className="text-muted-foreground" />
-                )}
-              </button>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => handleSpeak(translatedText, 'en-US')}
+                  className="p-2 hover:bg-muted rounded-lg"
+                >
+                  <Volume2 size={18} className="text-muted-foreground" />
+                </button>
+                <button onClick={handleCopy} className="p-2 hover:bg-muted rounded-lg">
+                  {copied ? (
+                    <Check size={18} className="text-success" />
+                  ) : (
+                    <Copy size={18} className="text-muted-foreground" />
+                  )}
+                </button>
+              </div>
             </div>
             <p className="text-foreground leading-relaxed">{translatedText}</p>
           </MotiCard>
         )}
 
         {translatedText && (
-          <MotiButton size="full" onClick={() => toast.success('Notes saved!')}>
-            Save as Notes
+          <MotiButton size="full" onClick={handleSaveAsNote}>
+            <Save size={18} /> Save as Notes
           </MotiButton>
         )}
       </div>
