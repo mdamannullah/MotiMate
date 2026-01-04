@@ -1,64 +1,186 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MotiButton } from '@/components/ui/MotiButton';
 import { MotiInput } from '@/components/ui/MotiInput';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Mail, Lock, Eye, EyeOff, ArrowLeft, GraduationCap, ChevronDown, Check, MapPin, Building2 } from 'lucide-react';
+import { useData } from '@/contexts/DataContext';
+import { User, Mail, Lock, Eye, EyeOff, ArrowLeft, ChevronDown, Check, MapPin, Building2, GraduationCap, BookOpen, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   countries, 
-  indianStates, 
-  educationLevels, 
-  departments, 
+  educationLevels,
+  ugCourses,
+  pgCourses,
+  years,
+  semesters,
+  regulations,
+  schoolStreams,
+  getStatesForCountry,
+  getDistrictsForState,
   getBoardsForState, 
   getUniversitiesForState,
-  getSubjectsForDepartment 
+  getCollegesForUniversity,
+  getDepartmentsForCourse,
+  getSubjectsForDepartment,
+  validateName,
+  validateEmail,
+  validatePassword
 } from '@/data/educationData';
+
+interface DropdownProps {
+  label: string;
+  value: string;
+  options: string[] | { id?: string; code?: string; name: string; flag?: string; category?: string }[];
+  onChange: (value: string) => void;
+  placeholder: string;
+  error?: string;
+  showFlag?: boolean;
+}
+
+const Dropdown = ({ label, value, options, onChange, placeholder, error, showFlag }: DropdownProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const getDisplayValue = () => {
+    if (!value) return null;
+    const option = options.find(o => {
+      if (typeof o === 'string') return o === value;
+      return o.id === value || o.code === value || o.name === value;
+    });
+    if (typeof option === 'string') return option;
+    if (option && typeof option === 'object') {
+      return showFlag && option.flag ? `${option.flag} ${option.name}` : option.name;
+    }
+    return value;
+  };
+
+  return (
+    <div className="relative">
+      <label className="block text-sm font-medium text-foreground mb-2">{label}</label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`moti-input flex items-center justify-between ${error ? 'border-destructive' : ''}`}
+      >
+        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>
+          {getDisplayValue() || placeholder}
+        </span>
+        <ChevronDown size={20} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {error && <p className="text-sm text-destructive mt-1">{error}</p>}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="absolute z-50 w-full mt-2 bg-card rounded-xl border border-border max-h-48 overflow-y-auto shadow-lg"
+          >
+            {options.map((option, idx) => {
+              const optionValue = typeof option === 'string' ? option : (option.id || option.code || option.name);
+              const optionName = typeof option === 'string' ? option : option.name;
+              const optionFlag = typeof option === 'object' && option.flag;
+              const isSelected = value === optionValue || value === optionName;
+              
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => { onChange(optionValue); setIsOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
+                >
+                  {showFlag && optionFlag && <span className="text-xl">{optionFlag}</span>}
+                  <span className="flex-1">{optionName}</span>
+                  {isSelected && <Check size={18} className="text-primary" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function SignupScreen() {
   const navigate = useNavigate();
   const { signup, isLoading } = useAuth();
+  const { addNotification } = useData();
   
   const [step, setStep] = useState(1);
+  const totalSteps = 4;
+  
+  // Step 1: Personal Info
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  // Location
+  // Step 2: Location
   const [country, setCountry] = useState('IN');
   const [state, setState] = useState('');
-  const [board, setBoard] = useState('');
-  const [university, setUniversity] = useState('');
-  const [isAutonomous, setIsAutonomous] = useState(false);
+  const [district, setDistrict] = useState('');
   
-  // Education
+  // Step 3: Education
   const [educationLevel, setEducationLevel] = useState('');
+  const [board, setBoard] = useState('');
+  const [stream, setStream] = useState('');
+  const [course, setCourse] = useState('');
+  const [university, setUniversity] = useState('');
+  const [college, setCollege] = useState('');
+  const [isAutonomous, setIsAutonomous] = useState(false);
   const [department, setDepartment] = useState('');
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [year, setYear] = useState('');
+  const [semester, setSemester] = useState('');
+  const [regulation, setRegulation] = useState('');
   
-  // Dropdowns
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const [showStateDropdown, setShowStateDropdown] = useState(false);
-  const [showBoardDropdown, setShowBoardDropdown] = useState(false);
-  const [showUniversityDropdown, setShowUniversityDropdown] = useState(false);
-  const [showEducationDropdown, setShowEducationDropdown] = useState(false);
-  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  // Step 4: Subjects
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sendingOTP, setSendingOTP] = useState(false);
 
+  // Get derived data
+  const states = getStatesForCountry(country);
+  const districts = state ? getDistrictsForState(state) : [];
+  const boards = state ? getBoardsForState(state) : [];
+  const universities = state ? getUniversitiesForState(state) : [];
+  const colleges = university ? getCollegesForUniversity(university) : [];
+  
+  const isSchoolLevel = ['primary', 'middle', 'secondary', 'higher_secondary'].includes(educationLevel);
+  const isHigherEducation = ['undergraduate', 'postgraduate', 'diploma', 'phd'].includes(educationLevel);
+  const courses = educationLevel === 'postgraduate' ? pgCourses : ugCourses;
+  const departments = course ? getDepartmentsForCourse(course) : [];
+  const subjects = department ? getSubjectsForDepartment(department) : (stream ? getSubjectsForDepartment(stream) : []);
+
+  // Reset dependent fields when parent changes
+  useEffect(() => { setState(''); setDistrict(''); }, [country]);
+  useEffect(() => { setDistrict(''); setBoard(''); setUniversity(''); }, [state]);
+  useEffect(() => { 
+    setBoard(''); setStream(''); setCourse(''); setUniversity(''); 
+    setCollege(''); setDepartment(''); setYear(''); setSemester(''); 
+    setSelectedSubjects([]);
+  }, [educationLevel]);
+  useEffect(() => { setDepartment(''); setSelectedSubjects([]); }, [course]);
+  useEffect(() => { setCollege(''); }, [university]);
+  useEffect(() => { setSelectedSubjects([]); }, [department, stream]);
+
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Name is required';
-    if (!email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Enter a valid email';
-    if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    
+    const nameValidation = validateName(name);
+    if (!nameValidation.valid) newErrors.name = nameValidation.error!;
+    
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) newErrors.email = emailValidation.error!;
+    
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) newErrors.password = passwordValidation.error!;
+    
     if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -66,7 +188,8 @@ export default function SignupScreen() {
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
     if (!country) newErrors.country = 'Please select your country';
-    if (country === 'IN' && !state) newErrors.state = 'Please select your state';
+    if (!state) newErrors.state = 'Please select your state';
+    if (country === 'IN' && !district) newErrors.district = 'Please select your district';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -74,7 +197,25 @@ export default function SignupScreen() {
   const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
     if (!educationLevel) newErrors.education = 'Please select your education level';
-    if (!department) newErrors.department = 'Please select your department/stream';
+    
+    if (isSchoolLevel) {
+      if (!board) newErrors.board = 'Please select your board';
+      if (educationLevel === 'higher_secondary' && !stream) newErrors.stream = 'Please select your stream';
+    } else if (isHigherEducation) {
+      if (!course) newErrors.course = 'Please select your course';
+      if (!university) newErrors.university = 'Please select your university';
+      if (!college) newErrors.college = 'Please enter your college name';
+      if (!department) newErrors.department = 'Please select your department';
+      if (!year) newErrors.year = 'Please select your year';
+      if (!semester) newErrors.semester = 'Please select your semester';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep4 = () => {
+    const newErrors: Record<string, string> = {};
     if (selectedSubjects.length === 0) newErrors.subjects = 'Please select at least one subject';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -83,6 +224,7 @@ export default function SignupScreen() {
   const handleNext = () => {
     if (step === 1 && validateStep1()) setStep(2);
     else if (step === 2 && validateStep2()) setStep(3);
+    else if (step === 3 && validateStep3()) setStep(4);
   };
 
   const handleBack = () => {
@@ -99,20 +241,27 @@ export default function SignupScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep3()) return;
+    if (!validateStep4()) return;
     
     setSendingOTP(true);
     
     try {
-      // Store education info
+      // Store comprehensive education info
       const educationData = {
         country,
         state,
-        board,
-        university,
-        isAutonomous,
+        district,
         level: educationLevel,
-        department,
+        board: isSchoolLevel ? board : null,
+        stream: isSchoolLevel && educationLevel === 'higher_secondary' ? stream : null,
+        course: isHigherEducation ? course : null,
+        university: isHigherEducation ? university : null,
+        college: isHigherEducation ? college : null,
+        isAutonomous,
+        department: isHigherEducation ? department : null,
+        year: isHigherEducation ? year : null,
+        semester: isHigherEducation ? semester : null,
+        regulation: isHigherEducation ? regulation : null,
         subjects: selectedSubjects
       };
       localStorage.setItem('motimate_education', JSON.stringify(educationData));
@@ -138,13 +287,6 @@ export default function SignupScreen() {
     }
   };
 
-  const selectedEducation = educationLevels.find(e => e.id === educationLevel);
-  const availableDepartments = educationLevel ? departments[educationLevel] || [] : [];
-  const availableBoards = state ? getBoardsForState(state) : [];
-  const availableUniversities = state ? getUniversitiesForState(state) : [];
-  const availableSubjects = department ? getSubjectsForDepartment(department) : [];
-  const isSchoolLevel = educationLevel === 'school';
-
   return (
     <div className="mobile-container min-h-screen flex flex-col">
       <motion.button
@@ -158,15 +300,17 @@ export default function SignupScreen() {
       <div className="flex-1 flex flex-col px-6 pt-20 pb-8 overflow-y-auto">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          {[1, 2, 3].map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-3 h-3 rounded-full ${step >= s ? 'bg-primary' : 'bg-muted'}`} />
-              {i < 2 && <div className={`w-8 h-0.5 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div key={i} className="flex items-center">
+              <div className={`w-3 h-3 rounded-full transition-colors ${step >= i + 1 ? 'bg-primary' : 'bg-muted'}`} />
+              {i < totalSteps - 1 && <div className={`w-6 h-0.5 transition-colors ${step > i + 1 ? 'bg-primary' : 'bg-muted'}`} />}
             </div>
           ))}
         </div>
+        <p className="text-center text-sm text-muted-foreground mb-6">Step {step} of {totalSteps}</p>
 
         <AnimatePresence mode="wait">
+          {/* Step 1: Personal Information */}
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
               <div className="text-center mb-6">
@@ -174,19 +318,21 @@ export default function SignupScreen() {
                   <User size={32} className="text-primary" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2">Create Account</h1>
-                <p className="text-muted-foreground">Join MotiMate and start learning smarter</p>
+                <p className="text-muted-foreground text-sm">Enter your personal details</p>
               </div>
 
               <div className="space-y-4">
-                <MotiInput
-                  label="Full Name"
-                  type="text"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  error={errors.name}
-                  icon={<User size={20} />}
-                />
+                <div>
+                  <MotiInput
+                    label="Full Name"
+                    type="text"
+                    placeholder="Enter your full name (alphabets only)"
+                    value={name}
+                    onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                    error={errors.name}
+                    icon={<User size={20} />}
+                  />
+                </div>
                 <MotiInput
                   label="Email"
                   type="email"
@@ -196,20 +342,36 @@ export default function SignupScreen() {
                   error={errors.email}
                   icon={<Mail size={20} />}
                 />
-                <MotiInput
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Create a password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={errors.password}
-                  icon={<Lock size={20} />}
-                  rightIcon={
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="hover:text-foreground transition-colors">
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                  }
-                />
+                <div>
+                  <MotiInput
+                    label="Password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Min 8 chars, 1 uppercase, 1 digit, 1 special"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    error={errors.password}
+                    icon={<Lock size={20} />}
+                    rightIcon={
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="hover:text-foreground transition-colors">
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    }
+                  />
+                  <div className="mt-2 space-y-1">
+                    <p className={`text-xs ${password.length >= 8 ? 'text-success' : 'text-muted-foreground'}`}>
+                      ✓ At least 8 characters
+                    </p>
+                    <p className={`text-xs ${/[A-Z]/.test(password) ? 'text-success' : 'text-muted-foreground'}`}>
+                      ✓ One uppercase letter
+                    </p>
+                    <p className={`text-xs ${/[0-9]/.test(password) ? 'text-success' : 'text-muted-foreground'}`}>
+                      ✓ One digit (0-9)
+                    </p>
+                    <p className={`text-xs ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? 'text-success' : 'text-muted-foreground'}`}>
+                      ✓ One special character
+                    </p>
+                  </div>
+                </div>
                 <MotiInput
                   label="Confirm Password"
                   type={showPassword ? 'text' : 'password'}
@@ -227,6 +389,7 @@ export default function SignupScreen() {
             </motion.div>
           )}
 
+          {/* Step 2: Location */}
           {step === 2 && (
             <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="text-center mb-6">
@@ -234,175 +397,40 @@ export default function SignupScreen() {
                   <MapPin size={32} className="text-primary" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2">Your Location</h1>
-                <p className="text-muted-foreground">This helps personalize your content</p>
+                <p className="text-muted-foreground text-sm">This helps personalize your content</p>
               </div>
 
               <div className="space-y-4">
-                {/* Country Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Country</label>
-                  <button
-                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                    className={`moti-input flex items-center justify-between ${errors.country ? 'border-destructive' : ''}`}
-                  >
-                    <span className={country ? 'text-foreground' : 'text-muted-foreground'}>
-                      {countries.find(c => c.code === country)?.name || 'Select country'}
-                    </span>
-                    <ChevronDown size={20} className={`transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-                  <AnimatePresence>
-                    {showCountryDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-2 bg-card rounded-xl border border-border max-h-48 overflow-y-auto shadow-lg"
-                      >
-                        {countries.map((c) => (
-                          <button
-                            key={c.code}
-                            onClick={() => { setCountry(c.code); setState(''); setShowCountryDropdown(false); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                          >
-                            <span className="flex-1">{c.name}</span>
-                            {country === c.code && <Check size={18} className="text-primary" />}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* State Dropdown (for India) */}
-                {country === 'IN' && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <label className="block text-sm font-medium text-foreground mb-2">State</label>
-                    <button
-                      onClick={() => setShowStateDropdown(!showStateDropdown)}
-                      className={`moti-input flex items-center justify-between ${errors.state ? 'border-destructive' : ''}`}
-                    >
-                      <span className={state ? 'text-foreground' : 'text-muted-foreground'}>
-                        {state || 'Select state'}
-                      </span>
-                      <ChevronDown size={20} className={`transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-                    {errors.state && <p className="text-sm text-destructive mt-1">{errors.state}</p>}
-                    <AnimatePresence>
-                      {showStateDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-2 bg-card rounded-xl border border-border max-h-48 overflow-y-auto shadow-lg"
-                        >
-                          {indianStates.map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => { setState(s); setBoard(''); setUniversity(''); setShowStateDropdown(false); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                            >
-                              <span className="flex-1">{s}</span>
-                              {state === s && <Check size={18} className="text-primary" />}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                <Dropdown
+                  label="Country"
+                  value={country}
+                  options={countries}
+                  onChange={setCountry}
+                  placeholder="Select country"
+                  error={errors.country}
+                  showFlag
+                />
+                
+                {states.length > 0 && (
+                  <Dropdown
+                    label="State/Province"
+                    value={state}
+                    options={states}
+                    onChange={setState}
+                    placeholder="Select state"
+                    error={errors.state}
+                  />
                 )}
-
-                {/* Board Dropdown (for school students) */}
-                {state && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <label className="block text-sm font-medium text-foreground mb-2">Board (for School/+2)</label>
-                    <button
-                      onClick={() => setShowBoardDropdown(!showBoardDropdown)}
-                      className="moti-input flex items-center justify-between"
-                    >
-                      <span className={board ? 'text-foreground' : 'text-muted-foreground'}>
-                        {board || 'Select board (optional)'}
-                      </span>
-                      <ChevronDown size={20} className={`transition-transform ${showBoardDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
-                      {showBoardDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-2 bg-card rounded-xl border border-border max-h-48 overflow-y-auto shadow-lg"
-                        >
-                          {availableBoards.map((b) => (
-                            <button
-                              key={b}
-                              onClick={() => { setBoard(b); setShowBoardDropdown(false); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                            >
-                              <span className="flex-1">{b}</span>
-                              {board === b && <Check size={18} className="text-primary" />}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-
-                {/* University Dropdown (for college students) */}
-                {state && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                    <label className="block text-sm font-medium text-foreground mb-2">University (for College)</label>
-                    <button
-                      onClick={() => setShowUniversityDropdown(!showUniversityDropdown)}
-                      className="moti-input flex items-center justify-between"
-                    >
-                      <span className={university ? 'text-foreground' : 'text-muted-foreground'}>
-                        {university || 'Select university (optional)'}
-                      </span>
-                      <ChevronDown size={20} className={`transition-transform ${showUniversityDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
-                      {showUniversityDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-2 bg-card rounded-xl border border-border max-h-48 overflow-y-auto shadow-lg"
-                        >
-                          {availableUniversities.map((u) => (
-                            <button
-                              key={u}
-                              onClick={() => { setUniversity(u); setShowUniversityDropdown(false); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                            >
-                              <span className="flex-1">{u}</span>
-                              {university === u && <Check size={18} className="text-primary" />}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-
-                {/* Autonomous College Checkbox */}
-                {university && university !== 'Autonomous College' && (
-                  <motion.label 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isAutonomous}
-                      onChange={(e) => setIsAutonomous(e.target.checked)}
-                      className="w-5 h-5 rounded border-primary text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <p className="font-medium text-sm">Autonomous College</p>
-                      <p className="text-xs text-muted-foreground">Check if your college is autonomous</p>
-                    </div>
-                  </motion.label>
+                
+                {country === 'IN' && state && districts.length > 0 && (
+                  <Dropdown
+                    label="District"
+                    value={district}
+                    options={districts}
+                    onChange={setDistrict}
+                    placeholder="Select district"
+                    error={errors.district}
+                  />
                 )}
               </div>
 
@@ -412,6 +440,7 @@ export default function SignupScreen() {
             </motion.div>
           )}
 
+          {/* Step 3: Education */}
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="text-center mb-6">
@@ -419,151 +448,205 @@ export default function SignupScreen() {
                   <GraduationCap size={32} className="text-primary" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2">Education Details</h1>
-                <p className="text-muted-foreground">This helps AI personalize your learning</p>
+                <p className="text-muted-foreground text-sm">Tell us about your academic background</p>
               </div>
 
               <div className="space-y-4">
-                {/* Education Level Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Education Level</label>
-                  <button
-                    onClick={() => setShowEducationDropdown(!showEducationDropdown)}
-                    className={`moti-input flex items-center justify-between ${errors.education ? 'border-destructive' : ''}`}
-                  >
-                    <span className={selectedEducation ? 'text-foreground' : 'text-muted-foreground'}>
-                      {selectedEducation ? `${selectedEducation.icon} ${selectedEducation.name}` : 'Select education level'}
-                    </span>
-                    <ChevronDown size={20} className={`transition-transform ${showEducationDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-                  {errors.education && <p className="text-sm text-destructive mt-1">{errors.education}</p>}
-                  
-                  <AnimatePresence>
-                    {showEducationDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-2 bg-card rounded-xl border border-border max-h-60 overflow-y-auto shadow-lg"
-                      >
-                        {educationLevels.map((edu) => (
-                          <button
-                            key={edu.id}
-                            onClick={() => {
-                              setEducationLevel(edu.id);
-                              setDepartment('');
-                              setSelectedSubjects([]);
-                              setShowEducationDropdown(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                          >
-                            <span className="text-xl">{edu.icon}</span>
-                            <span className="flex-1">{edu.name}</span>
-                            {educationLevel === edu.id && <Check size={18} className="text-primary" />}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                <Dropdown
+                  label="Education Level"
+                  value={educationLevel}
+                  options={educationLevels}
+                  onChange={setEducationLevel}
+                  placeholder="Select your current level"
+                  error={errors.education}
+                />
 
-                {/* Department Dropdown */}
-                {educationLevel && availableDepartments.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <label className="block text-sm font-medium text-foreground mb-2">Department / Stream</label>
-                    <button
-                      onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
-                      className={`moti-input flex items-center justify-between ${errors.department ? 'border-destructive' : ''}`}
-                    >
-                      <span className={department ? 'text-foreground' : 'text-muted-foreground'}>
-                        {department || 'Select your department'}
-                      </span>
-                      <ChevronDown size={20} className={`transition-transform ${showDepartmentDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-                    {errors.department && <p className="text-sm text-destructive mt-1">{errors.department}</p>}
+                {/* School Level Fields */}
+                {isSchoolLevel && (
+                  <>
+                    <Dropdown
+                      label="Education Board"
+                      value={board}
+                      options={boards}
+                      onChange={setBoard}
+                      placeholder="Select your board"
+                      error={errors.board}
+                    />
                     
-                    <AnimatePresence>
-                      {showDepartmentDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-2 bg-card rounded-xl border border-border max-h-60 overflow-y-auto shadow-lg"
-                        >
-                          {availableDepartments.map((dept) => (
-                            <button
-                              key={dept}
-                              onClick={() => {
-                                setDepartment(dept);
-                                setSelectedSubjects([]);
-                                setShowDepartmentDropdown(false);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
-                            >
-                              <span className="flex-1">{dept}</span>
-                              {department === dept && <Check size={18} className="text-primary" />}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                    {educationLevel === 'higher_secondary' && (
+                      <Dropdown
+                        label="Stream"
+                        value={stream}
+                        options={schoolStreams}
+                        onChange={setStream}
+                        placeholder="Select your stream"
+                        error={errors.stream}
+                      />
+                    )}
+                  </>
                 )}
 
-                {/* Subject Selection */}
-                {department && availableSubjects.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Select Your Subjects 
-                      <span className="text-muted-foreground font-normal"> (select all that apply)</span>
-                    </label>
-                    {errors.subjects && <p className="text-sm text-destructive mb-2">{errors.subjects}</p>}
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                      {availableSubjects.map((subject) => (
-                        <motion.button
-                          key={subject}
-                          onClick={() => toggleSubject(subject)}
-                          className={`flex items-center gap-2 p-3 rounded-xl border text-left text-sm transition-all ${
-                            selectedSubjects.includes(subject)
-                              ? 'bg-primary/10 border-primary text-primary'
-                              : 'bg-card border-border hover:border-primary/50'
-                          }`}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${
-                            selectedSubjects.includes(subject)
-                              ? 'bg-primary border-primary'
-                              : 'border-muted-foreground'
-                          }`}>
-                            {selectedSubjects.includes(subject) && (
-                              <Check size={12} className="text-primary-foreground" />
-                            )}
-                          </div>
-                          <span className="flex-1 truncate">{subject}</span>
-                        </motion.button>
-                      ))}
+                {/* Higher Education Fields */}
+                {isHigherEducation && (
+                  <>
+                    <Dropdown
+                      label="Course"
+                      value={course}
+                      options={courses}
+                      onChange={setCourse}
+                      placeholder="Select your course"
+                      error={errors.course}
+                    />
+
+                    <Dropdown
+                      label="University"
+                      value={university}
+                      options={universities}
+                      onChange={setUniversity}
+                      placeholder="Select your university"
+                      error={errors.university}
+                    />
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">College Name</label>
+                      <input
+                        type="text"
+                        value={college}
+                        onChange={(e) => setCollege(e.target.value)}
+                        placeholder="Enter your college name"
+                        className={`moti-input ${errors.college ? 'border-destructive' : ''}`}
+                        list="college-suggestions"
+                      />
+                      <datalist id="college-suggestions">
+                        {colleges.map((c, i) => <option key={i} value={c} />)}
+                      </datalist>
+                      {errors.college && <p className="text-sm text-destructive mt-1">{errors.college}</p>}
                     </div>
-                    {selectedSubjects.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {selectedSubjects.length} subject{selectedSubjects.length > 1 ? 's' : ''} selected
-                      </p>
+
+                    <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isAutonomous}
+                        onChange={(e) => setIsAutonomous(e.target.checked)}
+                        className="w-5 h-5 rounded border-2 border-primary text-primary focus:ring-primary"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">Autonomous College</p>
+                        <p className="text-xs text-muted-foreground">My college follows its own curriculum</p>
+                      </div>
+                    </label>
+
+                    {departments.length > 0 && (
+                      <Dropdown
+                        label="Department/Branch"
+                        value={department}
+                        options={departments}
+                        onChange={setDepartment}
+                        placeholder="Select your department"
+                        error={errors.department}
+                      />
                     )}
-                  </motion.div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Dropdown
+                        label="Year"
+                        value={year}
+                        options={years}
+                        onChange={setYear}
+                        placeholder="Select year"
+                        error={errors.year}
+                      />
+                      <Dropdown
+                        label="Semester"
+                        value={semester}
+                        options={semesters}
+                        onChange={setSemester}
+                        placeholder="Select sem"
+                        error={errors.semester}
+                      />
+                    </div>
+
+                    <Dropdown
+                      label="Regulation (Optional)"
+                      value={regulation}
+                      options={regulations}
+                      onChange={setRegulation}
+                      placeholder="Select regulation"
+                    />
+                  </>
                 )}
               </div>
 
               <div className="mt-6">
-                <MotiButton onClick={handleSubmit} size="full" loading={isLoading || sendingOTP}>
-                  {sendingOTP ? 'Sending OTP...' : 'Sign Up'}
+                <MotiButton onClick={handleNext} size="full">Continue</MotiButton>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 4: Subjects */}
+          {step === 4 && (
+            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <BookOpen size={32} className="text-primary" />
+                </div>
+                <h1 className="text-2xl font-bold mb-2">Select Subjects</h1>
+                <p className="text-muted-foreground text-sm">Choose the subjects you're studying</p>
+              </div>
+
+              {errors.subjects && (
+                <p className="text-sm text-destructive text-center mb-4">{errors.subjects}</p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 mb-6">
+                {subjects.map((subject, idx) => (
+                  <motion.button
+                    key={subject}
+                    type="button"
+                    onClick={() => toggleSubject(subject)}
+                    className={`p-3 rounded-xl text-sm text-left transition-all ${
+                      selectedSubjects.includes(subject)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card border border-border hover:border-primary'
+                    }`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {selectedSubjects.includes(subject) && <Check size={14} />}
+                      <span className="line-clamp-2">{subject}</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {selectedSubjects.length > 0 && (
+                <p className="text-center text-sm text-muted-foreground mb-4">
+                  {selectedSubjects.length} subject{selectedSubjects.length > 1 ? 's' : ''} selected
+                </p>
+              )}
+
+              <div className="mt-6">
+                <MotiButton 
+                  onClick={handleSubmit} 
+                  size="full" 
+                  disabled={sendingOTP || isLoading}
+                >
+                  {sendingOTP ? 'Sending OTP...' : 'Create Account'}
                 </MotiButton>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <p className="text-center text-muted-foreground mt-6">
-          Already have an account?{' '}
-          <button onClick={() => navigate('/login')} className="text-primary font-semibold">Login</button>
-        </p>
+        {/* Login Link */}
+        <div className="text-center mt-6">
+          <span className="text-muted-foreground text-sm">Already have an account? </span>
+          <button onClick={() => navigate('/login')} className="text-primary font-semibold text-sm">
+            Login
+          </button>
+        </div>
       </div>
     </div>
   );
