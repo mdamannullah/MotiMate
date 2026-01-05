@@ -273,8 +273,13 @@ export default function SignupScreen() {
 
       if (error) throw error;
       
-      // Store pending signup data
-      localStorage.setItem('motimate_pending_signup', JSON.stringify({ name, email, password }));
+      // Store pending signup data with education
+      localStorage.setItem('motimate_pending_signup', JSON.stringify({ 
+        name, 
+        email, 
+        password,
+        educationData
+      }));
       
       toast.success('OTP sent to your email! 📧');
       navigate('/verify-otp', { state: { email, type: 'signup' } });

@@ -3,60 +3,70 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { MotiCard } from '@/components/ui/MotiCard';
 import { MotiButton } from '@/components/ui/MotiButton';
-import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileText, Plus, Search, Calendar, Trash2, Eye, X, Edit3, Save } from 'lucide-react';
+import { useData } from '@/contexts/DataContext';
+import { supabase } from '@/integrations/supabase/client';
+import { FileText, Plus, Search, Calendar, Trash2, Eye, X, Edit3, Save, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Note {
   id: string;
+  user_id: string;
   title: string;
-  subject: string;
-  content: string;
-  createdAt: string;
-  timestamp: number;
+  content: string | null;
+  subject: string | null;
+  color: string;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function NotesScreen() {
-  const { user } = useAuth();
-  const { addNotification } = useData();
+  const { user, profile } = useAuth();
+  const { addNotification, incrementNotes } = useData();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   
-  // Form states
   const [newTitle, setNewTitle] = useState('');
   const [newSubject, setNewSubject] = useState('');
   const [newContent, setNewContent] = useState('');
 
-  // Get user's subjects for dropdown
-  const userSubjects = user?.education?.subjects || ['General', 'Physics', 'Chemistry', 'Mathematics', 'Biology'];
+  const userSubjects = profile?.subjects || ['General', 'Physics', 'Chemistry', 'Mathematics', 'Biology'];
 
-  // Load notes from localStorage
-  useEffect(() => {
-    const savedNotes = localStorage.getItem('motimate_notes');
-    if (savedNotes) {
-      setNotes(JSON.parse(savedNotes));
+  const fetchNotes = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('is_pinned', { ascending: false })
+      .order('updated_at', { ascending: false });
+
+    if (!error && data) {
+      setNotes(data);
     }
-  }, []);
-
-  // Save notes to localStorage
-  const saveNotes = (updatedNotes: Note[]) => {
-    localStorage.setItem('motimate_notes', JSON.stringify(updatedNotes));
-    setNotes(updatedNotes);
+    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchNotes();
+  }, [user]);
 
   const filteredNotes = notes.filter(
     (note) =>
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      (note.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+      (note.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
   );
 
-  const getSubjectColor = (subject: string) => {
+  const getSubjectColor = (subject: string | null) => {
     const colors: Record<string, string> = {
       'Biology': 'bg-success/10 text-success',
       'Physics': 'bg-primary/10 text-primary',
@@ -65,11 +75,11 @@ export default function NotesScreen() {
       'Computer Science': 'bg-blue-500/10 text-blue-500',
       'English': 'bg-amber-500/10 text-amber-500',
     };
-    return colors[subject] || 'bg-muted text-muted-foreground';
+    return colors[subject || ''] || 'bg-muted text-muted-foreground';
   };
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -85,78 +95,108 @@ export default function NotesScreen() {
     }
   };
 
-  const handleAddNote = () => {
-    if (!newTitle.trim() || !newContent.trim() || !newSubject) {
-      toast.error('Please fill in all fields');
+  const handleAddNote = async () => {
+    if (!user || !newTitle.trim() || !newContent.trim()) {
+      toast.error('Please fill in title and content');
       return;
     }
 
-    const newNote: Note = {
-      id: Date.now().toString(),
+    const { error } = await supabase.from('notes').insert({
+      user_id: user.id,
       title: newTitle.trim(),
-      subject: newSubject,
       content: newContent.trim(),
-      createdAt: new Date().toISOString(),
-      timestamp: Date.now(),
-    };
+      subject: newSubject || null,
+    });
 
-    const updatedNotes = [newNote, ...notes];
-    saveNotes(updatedNotes);
-    
-    // Add notification
-    addNotification({
+    if (error) {
+      toast.error('Failed to save note');
+      return;
+    }
+
+    await addNotification({
       title: 'Note Saved',
-      message: `Your note "${newTitle}" has been saved successfully!`,
+      message: `Your note "${newTitle}" has been saved!`,
       type: 'achievement'
     });
     
+    incrementNotes();
     toast.success('Note saved successfully! 📝');
     setShowAddModal(false);
     setNewTitle('');
     setNewSubject('');
     setNewContent('');
+    fetchNotes();
   };
 
-  const handleUpdateNote = () => {
-    if (!selectedNote || !newTitle.trim() || !newContent.trim() || !newSubject) {
-      toast.error('Please fill in all fields');
+  const handleUpdateNote = async () => {
+    if (!selectedNote || !newTitle.trim() || !newContent.trim()) {
+      toast.error('Please fill in title and content');
       return;
     }
 
-    const updatedNotes = notes.map(note => 
-      note.id === selectedNote.id 
-        ? { ...note, title: newTitle.trim(), subject: newSubject, content: newContent.trim() }
-        : note
-    );
-    saveNotes(updatedNotes);
-    
-    toast.success('Note updated successfully! ✏️');
+    const { error } = await supabase
+      .from('notes')
+      .update({
+        title: newTitle.trim(),
+        content: newContent.trim(),
+        subject: newSubject || null,
+      })
+      .eq('id', selectedNote.id);
+
+    if (error) {
+      toast.error('Failed to update note');
+      return;
+    }
+
+    toast.success('Note updated! ✏️');
     setIsEditing(false);
     setShowViewModal(false);
     setSelectedNote(null);
+    fetchNotes();
   };
 
-  const handleDeleteNote = (noteId: string) => {
+  const handleDeleteNote = async (noteId: string) => {
     const noteToDelete = notes.find(n => n.id === noteId);
-    const updatedNotes = notes.filter(note => note.id !== noteId);
-    saveNotes(updatedNotes);
     
-    addNotification({
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', noteId);
+
+    if (error) {
+      toast.error('Failed to delete note');
+      return;
+    }
+
+    await addNotification({
       title: 'Note Deleted',
       message: `"${noteToDelete?.title}" has been deleted.`,
-      type: 'reminder'
+      type: 'info'
     });
     
-    toast.success('Note deleted successfully!');
+    toast.success('Note deleted!');
     setShowViewModal(false);
     setSelectedNote(null);
+    fetchNotes();
+  };
+
+  const handleTogglePin = async (note: Note) => {
+    const { error } = await supabase
+      .from('notes')
+      .update({ is_pinned: !note.is_pinned })
+      .eq('id', note.id);
+
+    if (!error) {
+      toast.success(note.is_pinned ? 'Note unpinned' : 'Note pinned! 📌');
+      fetchNotes();
+    }
   };
 
   const openViewModal = (note: Note) => {
     setSelectedNote(note);
     setNewTitle(note.title);
-    setNewSubject(note.subject);
-    setNewContent(note.content);
+    setNewSubject(note.subject || '');
+    setNewContent(note.content || '');
     setIsEditing(false);
     setShowViewModal(true);
   };
@@ -181,7 +221,6 @@ export default function NotesScreen() {
           </MotiButton>
         </motion.div>
 
-        {/* Search */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative">
           <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -193,9 +232,12 @@ export default function NotesScreen() {
           />
         </motion.div>
 
-        {/* Notes List */}
         <div className="space-y-3">
-          {filteredNotes.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading notes...</p>
+            </div>
+          ) : filteredNotes.length > 0 ? (
             filteredNotes.map((note, index) => (
               <MotiCard key={note.id} delay={index * 0.05} className="cursor-pointer">
                 <div className="flex items-start gap-4">
@@ -204,18 +246,27 @@ export default function NotesScreen() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {note.is_pinned && <Pin size={14} className="text-primary" />}
                       <h3 className="font-semibold truncate">{note.title}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${getSubjectColor(note.subject)}`}>
-                        {note.subject}
-                      </span>
+                      {note.subject && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${getSubjectColor(note.subject)}`}>
+                          {note.subject}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{note.content}</p>
                     <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
                       <Calendar size={12} />
-                      {formatDate(note.timestamp)}
+                      {formatDate(note.updated_at)}
                     </div>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleTogglePin(note); }}
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                    >
+                      {note.is_pinned ? <PinOff size={16} className="text-primary" /> : <Pin size={16} className="text-muted-foreground" />}
+                    </button>
                     <button 
                       onClick={() => openViewModal(note)}
                       className="p-2 hover:bg-muted rounded-lg transition-colors"
@@ -398,12 +449,14 @@ export default function NotesScreen() {
                 ) : (
                   <>
                     <div>
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs mb-2 ${getSubjectColor(selectedNote.subject)}`}>
-                        {selectedNote.subject}
-                      </span>
+                      {selectedNote.subject && (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs mb-2 ${getSubjectColor(selectedNote.subject)}`}>
+                          {selectedNote.subject}
+                        </span>
+                      )}
                       <h3 className="text-lg font-semibold">{selectedNote.title}</h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDate(selectedNote.timestamp)}
+                        {formatDate(selectedNote.updated_at)}
                       </p>
                     </div>
 

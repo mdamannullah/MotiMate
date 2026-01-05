@@ -9,7 +9,6 @@ import {
   Settings, 
   LogOut, 
   Crown,
-  FileText,
   Bell,
   ChevronRight,
   Sparkles
@@ -19,7 +18,6 @@ import { useData } from '@/contexts/DataContext';
 import { toast } from 'sonner';
 import splashMascot from '@/assets/splash-mascot.png';
 
-// Desktop sidebar navigation - matching reference image style
 const navItems = [
   { path: '/dashboard', icon: Home, label: 'Dashboard' },
   { path: '/tests', icon: BookOpen, label: 'Tests' },
@@ -36,13 +34,14 @@ const secondaryItems = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const { notifications, stats } = useData();
   
   const unreadCount = notifications.filter(n => !n.read).length;
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Student';
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success('Logged out successfully');
     navigate('/home', { replace: true });
   };
@@ -77,11 +76,11 @@ export function Sidebar() {
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
               <span className="text-primary font-bold text-lg">
-                {user?.name?.charAt(0) || 'S'}
+                {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold truncate">{user?.name || 'Student'}</p>
+              <p className="font-semibold truncate">{displayName}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />
@@ -170,20 +169,18 @@ export function Sidebar() {
       {/* Bottom Section */}
       <div className="p-4 border-t border-border space-y-3">
         {/* Upgrade Card */}
-        {user?.subscription === 'free' && (
-          <motion.div 
-            onClick={() => navigate('/subscription')}
-            className="bg-gradient-to-r from-primary to-primary-light p-4 rounded-2xl text-primary-foreground cursor-pointer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Crown size={18} />
-              <span className="font-bold">Upgrade to Pro</span>
-            </div>
-            <p className="text-xs opacity-90">Unlock unlimited tests & features</p>
-          </motion.div>
-        )}
+        <motion.div 
+          onClick={() => navigate('/subscription')}
+          className="bg-gradient-to-r from-primary to-primary-light p-4 rounded-2xl text-primary-foreground cursor-pointer"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Crown size={18} />
+            <span className="font-bold">Upgrade to Pro</span>
+          </div>
+          <p className="text-xs opacity-90">Unlock unlimited tests & features</p>
+        </motion.div>
 
         {/* Logout */}
         <motion.button

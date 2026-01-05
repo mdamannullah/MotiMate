@@ -17,7 +17,6 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  // Form validate karo
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
     
@@ -37,24 +36,21 @@ export default function LoginScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Login submit karo
   const handleSubmit = async () => {
     if (!validate()) return;
     
-    try {
-      const success = await login(email, password);
-      if (success) {
-        toast.success('Welcome back! 🎉');
-        navigate('/dashboard', { replace: true });
-      }
-    } catch (error) {
-      toast.error('Login failed. Please try again.');
+    const result = await login(email, password);
+    
+    if (result.success) {
+      toast.success('Welcome back! 🎉');
+      navigate('/dashboard', { replace: true });
+    } else {
+      toast.error(result.error || 'Login failed. Please try again.');
     }
   };
 
   return (
     <div className="mobile-container min-h-screen flex flex-col">
-      {/* Back button */}
       <motion.button
         onClick={() => navigate(-1)}
         className="absolute top-6 left-6 p-2 rounded-full hover:bg-muted/50"
@@ -64,7 +60,6 @@ export default function LoginScreen() {
       </motion.button>
 
       <div className="flex-1 flex flex-col px-6 pt-20">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,7 +74,6 @@ export default function LoginScreen() {
           <p className="text-muted-foreground">Login to continue your learning journey</p>
         </motion.div>
 
-        {/* Login form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -115,7 +109,6 @@ export default function LoginScreen() {
             }
           />
 
-          {/* Forgot password */}
           <div className="text-right">
             <button
               onClick={() => navigate('/forgot-password')}
@@ -127,7 +120,6 @@ export default function LoginScreen() {
         </motion.div>
       </div>
 
-      {/* Bottom section */}
       <div className="px-6 pb-8 space-y-4">
         <MotiButton onClick={handleSubmit} size="full" loading={isLoading}>
           Login

@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 export default function VerifyOtpScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyOtp, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   
   const email = location.state?.email || 'user@example.com';
   const type = location.state?.type || 'signup';
@@ -21,7 +21,6 @@ export default function VerifyOtpScreen() {
   const [canResend, setCanResend] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  // Resend timer countdown
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -31,13 +30,11 @@ export default function VerifyOtpScreen() {
     }
   }, [resendTimer]);
 
-  // OTP complete hone par verify karo
   const handleOtpComplete = async (value: string) => {
     setOtp(value);
     setError('');
   };
 
-  // Verify button click
   const handleVerify = async () => {
     if (otp.length !== 6) {
       setError('Please enter complete 6-digit OTP');
@@ -47,7 +44,6 @@ export default function VerifyOtpScreen() {
     setVerifying(true);
     
     try {
-      // Verify OTP via edge function
       const { data, error: verifyError } = await supabase.functions.invoke('verify-otp', {
         body: { email, otp }
       });
@@ -55,12 +51,42 @@ export default function VerifyOtpScreen() {
       if (verifyError) throw verifyError;
       
       if (data?.success) {
-        // Complete signup
-        const success = await verifyOtp(otp);
-        if (success) {
-          toast.success('Account verified successfully! 🎉');
-          navigate('/dashboard', { replace: true });
+        // Get pending signup data and complete registration
+        const pendingData = localStorage.getItem('motimate_pending_signup');
+        if (pendingData) {
+          const { name, email: signupEmail, password, educationData } = JSON.parse(pendingData);
+          
+          // Sign up the user
+          const { data: signupData, error: signupError } = await supabase.auth.signUp({
+            email: signupEmail,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/dashboard`,
+              data: { full_name: name }
+            }
+          });
+
+          if (signupError) {
+            setError(signupError.message);
+            toast.error(signupError.message);
+            setVerifying(false);
+            return;
+          }
+
+          // Update profile with education data
+          if (signupData.user && educationData) {
+            await supabase.from('profiles').update({
+              full_name: name,
+              ...educationData
+            }).eq('user_id', signupData.user.id);
+          }
+
+          localStorage.removeItem('motimate_pending_signup');
+          localStorage.removeItem('motimate_education');
         }
+
+        toast.success('Account verified successfully! 🎉');
+        navigate('/dashboard', { replace: true });
       } else {
         setError(data?.error || 'Invalid OTP. Please try again.');
         toast.error(data?.error || 'Invalid OTP');
@@ -73,12 +99,11 @@ export default function VerifyOtpScreen() {
     }
   };
 
-  // Resend OTP
   const handleResend = async () => {
     if (!canResend) return;
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-otp', {
+      const { error } = await supabase.functions.invoke('send-otp', {
         body: { email, type }
       });
       
@@ -95,7 +120,6 @@ export default function VerifyOtpScreen() {
 
   return (
     <div className="mobile-container min-h-screen flex flex-col">
-      {/* Back button */}
       <motion.button
         onClick={() => navigate(-1)}
         className="absolute top-6 left-6 p-2 rounded-full hover:bg-muted/50"
@@ -105,7 +129,6 @@ export default function VerifyOtpScreen() {
       </motion.button>
 
       <div className="flex-1 flex flex-col items-center px-6 pt-24">
-        {/* Icon */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -115,7 +138,6 @@ export default function VerifyOtpScreen() {
           <Mail size={36} className="text-primary" />
         </motion.div>
 
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -128,7 +150,6 @@ export default function VerifyOtpScreen() {
           </p>
         </motion.div>
 
-        {/* OTP Input */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -142,7 +163,6 @@ export default function VerifyOtpScreen() {
           />
         </motion.div>
 
-        {/* Resend section */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -164,7 +184,6 @@ export default function VerifyOtpScreen() {
           )}
         </motion.div>
 
-        {/* Demo hint */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -175,7 +194,6 @@ export default function VerifyOtpScreen() {
         </motion.p>
       </div>
 
-      {/* Verify button */}
       <div className="px-6 pb-8">
         <MotiButton onClick={handleVerify} size="full" loading={isLoading || verifying}>
           Verify OTP

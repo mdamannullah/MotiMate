@@ -13,20 +13,14 @@ export default function ChangePasswordScreen() {
   const { changePassword, isLoading } = useAuth();
   const { addNotification } = useData();
   
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSuccess, setIsSuccess] = useState(false);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!currentPassword) {
-      newErrors.currentPassword = 'Current password is required';
-    }
     
     if (!newPassword) {
       newErrors.newPassword = 'New password is required';
@@ -45,10 +39,10 @@ export default function ChangePasswordScreen() {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    const result = await changePassword(currentPassword, newPassword);
+    const result = await changePassword(newPassword);
     
     if (result.success) {
-      addNotification({
+      await addNotification({
         type: 'password_change',
         title: 'Password Changed',
         message: 'Your password has been successfully updated',
@@ -57,7 +51,7 @@ export default function ChangePasswordScreen() {
       setIsSuccess(true);
     } else {
       toast.error(result.error || 'Failed to change password');
-      setErrors({ currentPassword: result.error || 'Incorrect password' });
+      setErrors({ newPassword: result.error || 'Failed to change password' });
     }
   };
 
@@ -93,7 +87,6 @@ export default function ChangePasswordScreen() {
 
   return (
     <div className="mobile-container min-h-screen flex flex-col">
-      {/* Back button */}
       <motion.button
         onClick={() => navigate(-1)}
         className="absolute top-6 left-6 p-2 rounded-full hover:bg-muted/50 z-10"
@@ -103,7 +96,6 @@ export default function ChangePasswordScreen() {
       </motion.button>
 
       <div className="flex-1 flex flex-col px-6 pt-20">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,35 +105,15 @@ export default function ChangePasswordScreen() {
             <Lock size={32} className="text-primary" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Change Password</h1>
-          <p className="text-muted-foreground">Enter your current password and create a new one</p>
+          <p className="text-muted-foreground">Create a new password for your account</p>
         </motion.div>
 
-        {/* Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="space-y-4"
         >
-          <MotiInput
-            label="Current Password"
-            type={showCurrentPassword ? 'text' : 'password'}
-            placeholder="Enter current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            error={errors.currentPassword}
-            icon={<Lock size={20} />}
-            rightIcon={
-              <button
-                type="button"
-                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="hover:text-foreground transition-colors"
-              >
-                {showCurrentPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            }
-          />
-          
           <MotiInput
             label="New Password"
             type={showNewPassword ? 'text' : 'password'}
@@ -173,7 +145,6 @@ export default function ChangePasswordScreen() {
         </motion.div>
       </div>
 
-      {/* Submit button */}
       <div className="px-6 pb-8">
         <MotiButton onClick={handleSubmit} size="full" loading={isLoading}>
           Change Password

@@ -19,8 +19,10 @@ import aiTutorAvatar from '@/assets/ai-tutor-avatar.png';
 
 export default function DashboardScreen() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { stats, testHistory } = useData();
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Student';
 
   const quickActions = [
     { icon: Mic, label: 'Live Translate', desc: 'Translate lectures', path: '/live-translate', color: 'bg-primary/10 text-primary' },
@@ -29,7 +31,6 @@ export default function DashboardScreen() {
     { icon: BarChart3, label: 'Analytics', desc: 'View progress', path: '/analytics', color: 'bg-primary/10 text-primary' },
   ];
 
-  // Get recent activity from actual test history
   const recentActivity = testHistory.slice(0, 3).map(test => ({
     type: 'test' as const,
     title: `${test.subject} Test`,
@@ -48,11 +49,11 @@ export default function DashboardScreen() {
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div>
             <p className="text-muted-foreground text-sm">Welcome back,</p>
-            <h2 className="text-xl font-bold">{user?.name || 'Student'} 👋</h2>
+            <h2 className="text-xl font-bold">{displayName} 👋</h2>
           </div>
           <motion.div whileHover={{ scale: 1.05 }} onClick={() => navigate('/profile')} className="cursor-pointer">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-              <span className="text-primary font-bold text-lg">{user?.name?.charAt(0) || 'S'}</span>
+              <span className="text-primary font-bold text-lg">{displayName.charAt(0).toUpperCase()}</span>
             </div>
           </motion.div>
         </motion.div>
@@ -86,7 +87,7 @@ export default function DashboardScreen() {
           </div>
         </div>
 
-        {/* Stats Overview - shows actual data */}
+        {/* Stats Overview */}
         <div>
           <h3 className="font-semibold mb-3">Your Progress</h3>
           <MotiCard delay={0.4}>
@@ -116,7 +117,7 @@ export default function DashboardScreen() {
           </MotiCard>
         </div>
 
-        {/* Recent Activity - from actual data */}
+        {/* Recent Activity */}
         {recentActivity.length > 0 && (
           <div>
             <h3 className="font-semibold mb-3">Recent Activity</h3>
