@@ -2,60 +2,28 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MotiButton } from '@/components/ui/MotiButton';
-import { MotiInput } from '@/components/ui/MotiInput';
-import { OtpInput } from '@/components/ui/OtpInput';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Trash2, Mail, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-type Step = 'confirm' | 'credentials' | 'otp' | 'success';
+type Step = 'confirm' | 'success';
 
 export default function DeleteAccountScreen() {
   const navigate = useNavigate();
-  const { user, deleteAccount, verifyDeleteOtp, isLoading } = useAuth();
+  const { deleteAccount, isLoading } = useAuth();
   
   const [step, setStep] = useState<Step>('confirm');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleProceed = () => {
-    setStep('credentials');
-  };
-
-  const handleVerifyCredentials = async () => {
-    const newErrors: Record<string, string> = {};
+  const handleDelete = async () => {
+    const result = await deleteAccount();
     
-    if (!email) newErrors.email = 'Email is required';
-    if (!password) newErrors.password = 'Password is required';
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    const result = await deleteAccount(email, password);
-    
-    if (result.success && result.requiresOtp) {
-      toast.success('OTP sent to your email!');
-      setStep('otp');
-    } else {
-      toast.error(result.error || 'Verification failed');
-      setErrors({ email: result.error || 'Invalid credentials' });
-    }
-  };
-
-  const handleVerifyOtp = async (otp: string) => {
-    const success = await verifyDeleteOtp(otp);
-    
-    if (success) {
+    if (result.success) {
       setStep('success');
     } else {
-      toast.error('Invalid OTP. Please try again.');
+      toast.error(result.error || 'Failed to delete account');
     }
   };
 
-  // Success screen
   if (step === 'success') {
     return (
       <div className="mobile-container min-h-screen flex flex-col items-center justify-center px-6">
@@ -86,132 +54,6 @@ export default function DeleteAccountScreen() {
     );
   }
 
-  // OTP verification screen
-  if (step === 'otp') {
-    return (
-      <div className="mobile-container min-h-screen flex flex-col">
-        <motion.button
-          onClick={() => setStep('credentials')}
-          className="absolute top-6 left-6 p-2 rounded-full hover:bg-muted/50 z-10"
-          whileTap={{ scale: 0.9 }}
-        >
-          <ArrowLeft size={24} />
-        </motion.button>
-
-        <div className="flex-1 flex flex-col items-center px-6 pt-24">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6"
-          >
-            <Mail size={36} className="text-destructive" />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
-          >
-            <h1 className="text-2xl font-bold mb-2">Enter Verification Code</h1>
-            <p className="text-muted-foreground">
-              We sent a 6-digit code to<br />
-              <span className="text-foreground font-medium">{email}</span>
-            </p>
-          </motion.div>
-
-          <div className="w-full mb-8">
-            <OtpInput length={6} onComplete={handleVerifyOtp} />
-          </div>
-
-          <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
-            Demo: Use OTP <span className="font-mono font-bold text-primary">123456</span>
-          </p>
-        </div>
-
-        <div className="px-6 pb-8">
-          <MotiButton 
-            onClick={() => handleVerifyOtp('123456')} 
-            size="full" 
-            loading={isLoading}
-            className="bg-destructive hover:bg-destructive/90"
-          >
-            Delete My Account
-          </MotiButton>
-        </div>
-      </div>
-    );
-  }
-
-  // Credentials verification screen
-  if (step === 'credentials') {
-    return (
-      <div className="mobile-container min-h-screen flex flex-col">
-        <motion.button
-          onClick={() => setStep('confirm')}
-          className="absolute top-6 left-6 p-2 rounded-full hover:bg-muted/50 z-10"
-          whileTap={{ scale: 0.9 }}
-        >
-          <ArrowLeft size={24} />
-        </motion.button>
-
-        <div className="flex-1 flex flex-col px-6 pt-20">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
-          >
-            <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-              <Lock size={32} className="text-destructive" />
-            </div>
-            <h1 className="text-2xl font-bold mb-2">Verify Your Identity</h1>
-            <p className="text-muted-foreground">
-              Please enter your email and password to continue
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-4"
-          >
-            <MotiInput
-              label="Email"
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              error={errors.email}
-              icon={<Mail size={20} />}
-            />
-            
-            <MotiInput
-              label="Password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errors.password}
-              icon={<Lock size={20} />}
-            />
-          </motion.div>
-        </div>
-
-        <div className="px-6 pb-8">
-          <MotiButton 
-            onClick={handleVerifyCredentials} 
-            size="full" 
-            loading={isLoading}
-            className="bg-destructive hover:bg-destructive/90"
-          >
-            Continue
-          </MotiButton>
-        </div>
-      </div>
-    );
-  }
-
-  // Confirmation screen
   return (
     <div className="mobile-container min-h-screen flex flex-col">
       <motion.button
@@ -242,7 +84,6 @@ export default function DeleteAccountScreen() {
           </p>
         </motion.div>
 
-        {/* Warning */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -269,11 +110,12 @@ export default function DeleteAccountScreen() {
 
       <div className="px-6 pb-8 space-y-3">
         <MotiButton 
-          onClick={handleProceed} 
+          onClick={handleDelete} 
           size="full"
+          loading={isLoading}
           className="bg-destructive hover:bg-destructive/90"
         >
-          Continue with Deletion
+          Delete My Account
         </MotiButton>
         <MotiButton 
           onClick={() => navigate(-1)} 

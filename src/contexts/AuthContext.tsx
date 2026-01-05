@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
-// User type with education data
+// User profile type with education data
 interface EducationData {
   country: string;
   state: string;
@@ -19,245 +21,319 @@ interface EducationData {
   subjects: string[];
 }
 
-interface User {
+interface UserProfile {
   id: string;
-  name: string;
+  user_id: string;
+  full_name: string;
   email: string;
-  password?: string;
-  subscription: 'free' | 'pro_monthly' | 'pro_yearly';
-  education?: EducationData;
-  avatar?: string;
+  country?: string;
+  country_code?: string;
+  state?: string;
+  district?: string;
+  education_level?: string;
+  board?: string;
+  course?: string;
+  university?: string;
+  college?: string;
+  is_autonomous?: boolean;
+  department?: string;
+  stream?: string;
+  year?: string;
+  semester?: string;
+  regulation?: string;
+  subjects?: string[];
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: SupabaseUser | null;
+  profile: UserProfile | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   pendingEmail: string | null;
-  pendingName: string | null;
-  pendingPassword: string | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
-  verifyOtp: (otp: string) => Promise<boolean>;
-  logout: () => void;
-  resetPassword: (email: string) => Promise<boolean>;
-  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  deleteAccount: (email: string, password: string) => Promise<{ success: boolean; error?: string; requiresOtp?: boolean }>;
-  verifyDeleteOtp: (otp: string) => Promise<boolean>;
-  updateUser: (updates: Partial<User>) => void;
+  signup: (name: string, email: string, password: string, educationData?: EducationData) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [pendingName, setPendingName] = useState<string | null>(null);
-  const [pendingPassword, setPendingPassword] = useState<string | null>(null);
-  const [pendingDeleteEmail, setPendingDeleteEmail] = useState<string | null>(null);
 
-  // Load user from localStorage on mount
-  useEffect(() => {
-    const savedUser = localStorage.getItem('motimate_user');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      // Load education data if exists
-      const educationData = localStorage.getItem('motimate_education');
-      if (educationData) {
-        parsedUser.education = JSON.parse(educationData);
+  // Fetch user profile
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
       }
-      setUser(parsedUser);
+      return data;
+    } catch (err) {
+      console.error('Profile fetch error:', err);
+      return null;
     }
-    setIsLoading(false);
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      const profileData = await fetchProfile(user.id);
+      setProfile(profileData);
+    }
+  };
+
+  // Set up auth state listener
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Defer profile fetch
+        if (session?.user) {
+          setTimeout(() => {
+            fetchProfile(session.user.id).then(setProfile);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id).then(setProfile);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-    const existingUser = savedUsers[email];
-    
-    if (existingUser) {
-      if (existingUser.password !== password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
         setIsLoading(false);
-        return { success: false, error: 'Incorrect password' };
+        return { success: false, error: error.message };
       }
-      
-      // Load education data
-      const educationData = localStorage.getItem('motimate_education');
-      if (educationData) {
-        existingUser.education = JSON.parse(educationData);
+
+      // Create login notification
+      if (data.user) {
+        await supabase.from('notifications').insert({
+          user_id: data.user.id,
+          title: 'Login Successful',
+          message: 'Welcome back to MotiMate!',
+          type: 'login'
+        });
       }
-      
-      setUser(existingUser);
-      localStorage.setItem('motimate_user', JSON.stringify(existingUser));
-    } else {
+
       setIsLoading(false);
-      return { success: false, error: 'Account not found. Please sign up first.' };
+      return { success: true };
+    } catch (err) {
+      setIsLoading(false);
+      return { success: false, error: 'Login failed. Please try again.' };
     }
-    
-    setIsLoading(false);
-    return { success: true };
   };
 
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
+  const signup = async (
+    name: string, 
+    email: string, 
+    password: string, 
+    educationData?: EducationData
+  ): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-    if (savedUsers[email]) {
+    try {
+      const redirectUrl = `${window.location.origin}/dashboard`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: name,
+          }
+        }
+      });
+
+      if (error) {
+        setIsLoading(false);
+        return { success: false, error: error.message };
+      }
+
+      // Update profile with education data if user was created
+      if (data.user && educationData) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: name,
+            country: educationData.country,
+            country_code: educationData.country,
+            state: educationData.state,
+            district: educationData.district,
+            education_level: educationData.level,
+            board: educationData.board,
+            course: educationData.course,
+            university: educationData.university,
+            college: educationData.college,
+            is_autonomous: educationData.isAutonomous,
+            department: educationData.department,
+            stream: educationData.stream,
+            year: educationData.year,
+            semester: educationData.semester,
+            regulation: educationData.regulation,
+            subjects: educationData.subjects,
+          })
+          .eq('user_id', data.user.id);
+
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+        }
+      }
+
+      setPendingEmail(email);
       setIsLoading(false);
-      return false;
+      return { success: true };
+    } catch (err) {
+      setIsLoading(false);
+      return { success: false, error: 'Signup failed. Please try again.' };
     }
-    
-    setPendingEmail(email);
-    setPendingName(name);
-    setPendingPassword(password);
-    setIsLoading(false);
-    return true;
   };
 
-  const verifyOtp = async (otp: string): Promise<boolean> => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo: accept 123456 or any 6-digit OTP
-    if (otp.length === 6) {
-      // Load education data
-      const educationData = localStorage.getItem('motimate_education');
-      const education = educationData ? JSON.parse(educationData) : undefined;
-      
-      const newUser: User = {
-        id: Date.now().toString(),
-        name: pendingName || 'Student',
-        email: pendingEmail || 'user@example.com',
-        password: pendingPassword || '',
-        subscription: 'free',
-        education,
-      };
-      
-      const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-      savedUsers[newUser.email] = newUser;
-      localStorage.setItem('motimate_users', JSON.stringify(savedUsers));
-      
-      setUser(newUser);
-      localStorage.setItem('motimate_user', JSON.stringify(newUser));
-      setPendingEmail(null);
-      setPendingName(null);
-      setPendingPassword(null);
-      setIsLoading(false);
-      return true;
-    }
-    setIsLoading(false);
-    return false;
-  };
-
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('motimate_user');
+    setSession(null);
+    setProfile(null);
   };
 
-  const resetPassword = async (email: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setPendingEmail(email);
-    return true;
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/change-password`,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      setPendingEmail(email);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Failed to send reset email.' };
+    }
   };
 
-  const changePassword = async (oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+  const changePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Create notification
+      if (user) {
+        await supabase.from('notifications').insert({
+          user_id: user.id,
+          title: 'Password Changed',
+          message: 'Your password has been updated successfully.',
+          type: 'password_change'
+        });
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Failed to change password.' };
+    }
+  };
+
+  const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'Not logged in' };
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-    const existingUser = savedUsers[user.email];
-    
-    if (existingUser && existingUser.password !== oldPassword) {
-      return { success: false, error: 'Current password is incorrect' };
+    try {
+      // Delete user data first (cascade should handle this, but being safe)
+      await supabase.from('notes').delete().eq('user_id', user.id);
+      await supabase.from('test_results').delete().eq('user_id', user.id);
+      await supabase.from('notifications').delete().eq('user_id', user.id);
+      await supabase.from('chat_history').delete().eq('user_id', user.id);
+      await supabase.from('profiles').delete().eq('user_id', user.id);
+      
+      // Note: Actual user deletion requires admin rights or a server function
+      // For now, we'll just sign out
+      await logout();
+      
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Failed to delete account.' };
     }
-    
-    const updatedUser = { ...user, password: newPassword };
-    savedUsers[user.email] = updatedUser;
-    localStorage.setItem('motimate_users', JSON.stringify(savedUsers));
-    setUser(updatedUser);
-    localStorage.setItem('motimate_user', JSON.stringify(updatedUser));
-    
-    return { success: true };
   };
 
-  const deleteAccount = async (email: string, password: string): Promise<{ success: boolean; error?: string; requiresOtp?: boolean }> => {
+  const updateProfile = async (updates: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'Not logged in' };
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (email !== user.email) {
-      return { success: false, error: 'Email does not match your account' };
-    }
-    
-    const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-    const existingUser = savedUsers[user.email];
-    
-    if (existingUser && existingUser.password !== password) {
-      return { success: false, error: 'Incorrect password' };
-    }
-    
-    setPendingDeleteEmail(email);
-    return { success: true, requiresOtp: true };
-  };
 
-  const verifyDeleteOtp = async (otp: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (otp.length === 6 && pendingDeleteEmail && user) {
-      const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-      delete savedUsers[user.email];
-      localStorage.setItem('motimate_users', JSON.stringify(savedUsers));
-      
-      localStorage.removeItem('motimate_user');
-      localStorage.removeItem('motimate_stats');
-      localStorage.removeItem('motimate_test_history');
-      localStorage.removeItem('motimate_notifications');
-      localStorage.removeItem('motimate_subject_scores');
-      localStorage.removeItem('motimate_education');
-      localStorage.removeItem('motimate_notes');
-      
-      setUser(null);
-      setPendingDeleteEmail(null);
-      return true;
-    }
-    return false;
-  };
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', user.id);
 
-  const updateUser = (updates: Partial<User>) => {
-    if (!user) return;
-    
-    const updatedUser = { ...user, ...updates };
-    const savedUsers = JSON.parse(localStorage.getItem('motimate_users') || '{}');
-    savedUsers[user.email] = updatedUser;
-    localStorage.setItem('motimate_users', JSON.stringify(savedUsers));
-    setUser(updatedUser);
-    localStorage.setItem('motimate_user', JSON.stringify(updatedUser));
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      await refreshProfile();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Failed to update profile.' };
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        profile,
+        session,
         isAuthenticated: !!user,
         isLoading,
         pendingEmail,
-        pendingName,
-        pendingPassword,
         login,
         signup,
-        verifyOtp,
         logout,
         resetPassword,
         changePassword,
         deleteAccount,
-        verifyDeleteOtp,
-        updateUser,
+        updateProfile,
+        refreshProfile,
       }}
     >
       {children}

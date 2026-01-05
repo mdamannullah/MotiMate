@@ -14,7 +14,257 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          response: string | null
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          response?: string | null
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          response?: string | null
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          color: string | null
+          content: string | null
+          created_at: string | null
+          id: string
+          is_pinned: boolean | null
+          subject: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          subject?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          subject?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          board: string | null
+          college: string | null
+          country: string | null
+          country_code: string | null
+          course: string | null
+          created_at: string | null
+          department: string | null
+          district: string | null
+          education_level: string | null
+          email: string
+          full_name: string
+          id: string
+          is_autonomous: boolean | null
+          regulation: string | null
+          semester: string | null
+          state: string | null
+          stream: string | null
+          subjects: string[] | null
+          university: string | null
+          updated_at: string | null
+          user_id: string
+          year: string | null
+        }
+        Insert: {
+          board?: string | null
+          college?: string | null
+          country?: string | null
+          country_code?: string | null
+          course?: string | null
+          created_at?: string | null
+          department?: string | null
+          district?: string | null
+          education_level?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_autonomous?: boolean | null
+          regulation?: string | null
+          semester?: string | null
+          state?: string | null
+          stream?: string | null
+          subjects?: string[] | null
+          university?: string | null
+          updated_at?: string | null
+          user_id: string
+          year?: string | null
+        }
+        Update: {
+          board?: string | null
+          college?: string | null
+          country?: string | null
+          country_code?: string | null
+          course?: string | null
+          created_at?: string | null
+          department?: string | null
+          district?: string | null
+          education_level?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_autonomous?: boolean | null
+          regulation?: string | null
+          semester?: string | null
+          state?: string | null
+          stream?: string | null
+          subjects?: string[] | null
+          university?: string | null
+          updated_at?: string | null
+          user_id?: string
+          year?: string | null
+        }
+        Relationships: []
+      }
+      test_results: {
+        Row: {
+          answers: Json | null
+          completed_at: string | null
+          id: string
+          score: number
+          test_id: string
+          time_taken_seconds: number | null
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed_at?: string | null
+          id?: string
+          score: number
+          test_id: string
+          time_taken_seconds?: number | null
+          total_questions: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          completed_at?: string | null
+          id?: string
+          score?: number
+          test_id?: string
+          time_taken_seconds?: number | null
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_results_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tests: {
+        Row: {
+          course: string | null
+          created_at: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_active: boolean | null
+          semester: string | null
+          subject: string
+          title: string
+          total_questions: number | null
+          university: string | null
+        }
+        Insert: {
+          course?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          semester?: string | null
+          subject: string
+          title: string
+          total_questions?: number | null
+          university?: string | null
+        }
+        Update: {
+          course?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          semester?: string | null
+          subject?: string
+          title?: string
+          total_questions?: number | null
+          university?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

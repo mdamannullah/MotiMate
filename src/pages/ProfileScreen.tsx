@@ -7,7 +7,7 @@ import { MotiCard } from '@/components/ui/MotiCard';
 import { MotiButton } from '@/components/ui/MotiButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { User, Mail, Crown, Settings, FileText, Star, ChevronRight, LogOut, Camera } from 'lucide-react';
+import { User, Mail, Crown, Settings, FileText, Star, ChevronRight, LogOut, Camera, GraduationCap, MapPin, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -22,11 +22,13 @@ import {
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
-  const { user, logout, updateUser } = useAuth();
+  const { user, profile, logout } = useAuth();
   const { stats } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem('motimate_avatar'));
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Student';
 
   const menuItems = [
     { icon: FileText, label: 'My Notes', path: '/notes' },
@@ -34,8 +36,8 @@ export default function ProfileScreen() {
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success('Logged out successfully');
     navigate('/home', { replace: true });
   };
@@ -68,7 +70,7 @@ export default function ProfileScreen() {
                 {avatar ? (
                   <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-primary font-bold text-2xl">{user?.name?.charAt(0) || 'S'}</span>
+                  <span className="text-primary font-bold text-2xl">{displayName.charAt(0).toUpperCase()}</span>
                 )}
               </div>
               <motion.button
@@ -87,18 +89,19 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold">{user?.name || 'Student'}</h2>
+              <h2 className="text-xl font-bold">{displayName}</h2>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
               <div className="flex items-center gap-1 mt-2">
-                <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${user?.subscription === 'free' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+                <div className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-primary/10 text-primary">
                   <Crown size={12} />
-                  {user?.subscription === 'free' ? 'Free Plan' : 'Pro Plan'}
+                  Free Plan
                 </div>
               </div>
             </div>
           </div>
         </MotiCard>
 
+        {/* Contact Information */}
         <div>
           <h3 className="font-semibold mb-3">Contact Information</h3>
           <MotiCard delay={0.2}>
@@ -114,6 +117,55 @@ export default function ProfileScreen() {
           </MotiCard>
         </div>
 
+        {/* Academic Details */}
+        {profile && (profile.education_level || profile.course || profile.university) && (
+          <div>
+            <h3 className="font-semibold mb-3">Academic Details</h3>
+            <div className="space-y-2">
+              {profile.education_level && (
+                <MotiCard delay={0.25}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+                      <GraduationCap size={18} className="text-success" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Education Level</p>
+                      <p className="font-medium capitalize">{profile.education_level.replace('_', ' ')}</p>
+                    </div>
+                  </div>
+                </MotiCard>
+              )}
+              {profile.course && (
+                <MotiCard delay={0.3}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Building2 size={18} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Course</p>
+                      <p className="font-medium">{profile.course}</p>
+                    </div>
+                  </div>
+                </MotiCard>
+              )}
+              {profile.university && (
+                <MotiCard delay={0.35}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent-foreground/10 flex items-center justify-center">
+                      <MapPin size={18} className="text-accent-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">University</p>
+                      <p className="font-medium">{profile.university}</p>
+                    </div>
+                  </div>
+                </MotiCard>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Stats */}
         <div>
           <h3 className="font-semibold mb-3">Your Stats</h3>
           <div className="grid grid-cols-3 gap-3">
@@ -122,7 +174,7 @@ export default function ProfileScreen() {
               { label: 'Notes', value: stats.notesCreated.toString() },
               { label: 'Avg Score', value: stats.avgScore > 0 ? `${stats.avgScore}%` : '0%' },
             ].map((stat, index) => (
-              <MotiCard key={stat.label} delay={0.3 + index * 0.05}>
+              <MotiCard key={stat.label} delay={0.4 + index * 0.05}>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-primary">{stat.value}</p>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
@@ -132,9 +184,10 @@ export default function ProfileScreen() {
           </div>
         </div>
 
+        {/* Menu Items */}
         <div className="space-y-2">
           {menuItems.map((item, index) => (
-            <MotiCard key={item.label} delay={0.4 + index * 0.05} onClick={() => navigate(item.path)} className="cursor-pointer">
+            <MotiCard key={item.label} delay={0.5 + index * 0.05} onClick={() => navigate(item.path)} className="cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <item.icon size={18} className="text-primary" />
