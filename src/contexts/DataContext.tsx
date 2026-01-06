@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
-// User stats aur data ka type
 interface UserStats {
   testsCompleted: number;
   notesCreated: number;
@@ -50,11 +51,11 @@ interface DataContextType {
   addStudyTime: (minutes: number) => void;
   resetUserData: () => void;
   getAiTips: () => string[];
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Initial empty stats for new users
 const getInitialStats = (): UserStats => ({
   testsCompleted: 0,
   notesCreated: 0,
@@ -64,42 +65,138 @@ const getInitialStats = (): UserStats => ({
 });
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [stats, setStats] = useState<UserStats>(getInitialStats);
   const [testHistory, setTestHistory] = useState<TestResult[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [subjectScores, setSubjectScores] = useState<Record<string, SubjectScore>>({});
 
-  // LocalStorage se data load karo
+  // Fetch data from Supabase when user changes
+  const refreshData = useCallback(async () => {
+    if (!user) {
+      setStats(getInitialStats());
+      setTestHistory([]);
+      setNotifications([]);
+      setSubjectScores({});
+      return;
+    }
+
+    try {
+      // Fetch test results
+      const { data: testResults, error: testError } = await supabase
+        .from('test_results')
+        .select(`
+          id,
+          score,
+          total_questions,
+          completed_at,
+          time_taken_seconds,
+          tests (
+            title,
+            subject,
+            description
+          )
+        `)
+        .order('completed_at', { ascending: false });
+
+      if (testError) throw testError;
+
+      // Transform test results
+      const history: TestResult[] = (testResults || []).map(r => ({
+        id: r.id,
+        subject: r.tests?.subject || 'Unknown',
+        topic: r.tests?.title || r.tests?.description || 'Test',
+        score: r.score,
+        total: r.total_questions,
+        percentage: Math.round((r.score / r.total_questions) * 100),
+        date: r.completed_at ? new Date(r.completed_at).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : 'Unknown',
+        timestamp: r.completed_at ? new Date(r.completed_at).getTime() : Date.now()
+      }));
+
+      setTestHistory(history);
+
+      // Calculate stats and subject scores
+      let totalScore = 0;
+      let totalTime = 0;
+      const subjectMap: Record<string, SubjectScore> = {};
+
+      history.forEach(result => {
+        totalScore += result.percentage;
+        
+        if (!subjectMap[result.subject]) {
+          subjectMap[result.subject] = {
+            subject: result.subject,
+            totalScore: 0,
+            testsCount: 0,
+            avgScore: 0
+          };
+        }
+        subjectMap[result.subject].totalScore += result.percentage;
+        subjectMap[result.subject].testsCount += 1;
+      });
+
+      // Calculate averages
+      Object.keys(subjectMap).forEach(subject => {
+        subjectMap[subject].avgScore = Math.round(
+          subjectMap[subject].totalScore / subjectMap[subject].testsCount
+        );
+      });
+
+      setSubjectScores(subjectMap);
+
+      // Calculate study time from test results
+      (testResults || []).forEach(r => {
+        if (r.time_taken_seconds) {
+          totalTime += r.time_taken_seconds;
+        }
+      });
+
+      // Fetch notes count
+      const { count: notesCount } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch notifications
+      const { data: notificationsData } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const formattedNotifications: Notification[] = (notificationsData || []).map(n => ({
+        id: n.id,
+        type: n.type as Notification['type'],
+        title: n.title,
+        message: n.message,
+        timestamp: new Date(n.created_at || '').getTime(),
+        read: n.is_read || false
+      }));
+
+      setNotifications(formattedNotifications);
+
+      setStats({
+        testsCompleted: history.length,
+        notesCreated: notesCount || 0,
+        studyHours: Math.round((totalTime / 3600) * 10) / 10,
+        avgScore: history.length > 0 ? Math.round(totalScore / history.length) : 0,
+        totalScore
+      });
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  }, [user]);
+
   useEffect(() => {
-    const savedStats = localStorage.getItem('motimate_stats');
-    const savedHistory = localStorage.getItem('motimate_test_history');
-    const savedNotifications = localStorage.getItem('motimate_notifications');
-    const savedSubjectScores = localStorage.getItem('motimate_subject_scores');
+    refreshData();
+  }, [refreshData]);
 
-    if (savedStats) setStats(JSON.parse(savedStats));
-    if (savedHistory) setTestHistory(JSON.parse(savedHistory));
-    if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
-    if (savedSubjectScores) setSubjectScores(JSON.parse(savedSubjectScores));
-  }, []);
-
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem('motimate_stats', JSON.stringify(stats));
-  }, [stats]);
-
-  useEffect(() => {
-    localStorage.setItem('motimate_test_history', JSON.stringify(testHistory));
-  }, [testHistory]);
-
-  useEffect(() => {
-    localStorage.setItem('motimate_notifications', JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem('motimate_subject_scores', JSON.stringify(subjectScores));
-  }, [subjectScores]);
-
-  // Weekly data calculate karo from test history
+  // Weekly data calculate from test history
   const weeklyData = React.useMemo(() => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const now = new Date();
@@ -123,7 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, [testHistory]);
 
-  // Test result add karo
+  // Add test result (local state update - DB save happens in TakeTestScreen)
   const addTestResult = (result: Omit<TestResult, 'id' | 'timestamp'>) => {
     const newResult: TestResult = {
       ...result,
@@ -160,34 +257,62 @@ export function DataProvider({ children }: { children: ReactNode }) {
         },
       };
     });
-
-    // Add notification
-    addNotification({
-      type: 'test_completed',
-      title: 'Test Completed! 🎉',
-      message: `You scored ${result.percentage}% in ${result.subject} - ${result.topic}`,
-    });
   };
 
-  // Notification add karo
-  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      read: false,
-    };
-    setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Max 50 notifications
+  // Add notification
+  const addNotification = async (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from('notifications').insert({
+        user_id: user.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type
+      });
+
+      if (error) throw error;
+
+      const newNotification: Notification = {
+        ...notification,
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        read: false,
+      };
+      setNotifications(prev => [newNotification, ...prev].slice(0, 50));
+    } catch (error) {
+      console.error('Error adding notification:', error);
+    }
   };
 
-  const markNotificationRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
+  const markNotificationRead = async (id: string) => {
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (error) {
+      console.error('Error marking notification read:', error);
+    }
   };
 
-  const clearAllNotifications = () => {
-    setNotifications([]);
+  const clearAllNotifications = async () => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
   };
 
   const incrementNotes = () => {
@@ -206,10 +331,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setTestHistory([]);
     setNotifications([]);
     setSubjectScores({});
-    localStorage.removeItem('motimate_stats');
-    localStorage.removeItem('motimate_test_history');
-    localStorage.removeItem('motimate_notifications');
-    localStorage.removeItem('motimate_subject_scores');
   };
 
   // AI tips based on performance
@@ -221,7 +342,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       tips.push('Create your first smart note to organize your studies');
       tips.push('Set a daily study goal to stay consistent');
     } else {
-      // Find weakest subject
       const subjects = Object.values(subjectScores);
       if (subjects.length > 0) {
         const weakest = subjects.reduce((a, b) => (a.avgScore < b.avgScore ? a : b));
@@ -263,6 +383,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         addStudyTime,
         resetUserData,
         getAiTips,
+        refreshData,
       }}
     >
       {children}
