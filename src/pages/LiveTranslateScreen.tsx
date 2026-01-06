@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { MotiCard } from '@/components/ui/MotiCard';
 import { MotiButton } from '@/components/ui/MotiButton';
 import { useData } from '@/contexts/DataContext';
-import { Mic, MicOff, Globe, Volume2, Copy, Check, Languages, Save, StopCircle } from 'lucide-react';
+import { Mic, Globe, Volume2, Copy, Check, Languages, Save, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { supabase } from '@/integrations/supabase/client';
 
 const languages = [
   { code: 'ta-IN', name: 'Tamil', native: 'தமிழ்' },
@@ -19,10 +20,18 @@ const languages = [
   { code: 'gu-IN', name: 'Gujarati', native: 'ગુજરાતી' },
 ];
 
-// Simple translation simulation (in production, use a real translation API)
-const translateToEnglish = (text: string, sourceLang: string): string => {
-  // This is a placeholder - in production, integrate with Google Translate or similar
-  return `[Translated from ${sourceLang}]: ${text}`;
+// Translate using the edge function
+const translateToEnglish = async (text: string, sourceLang: string): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('translate-text', {
+    body: { text, sourceLang, targetLang: 'English' }
+  });
+  
+  if (error) {
+    console.error('Translation error:', error);
+    throw new Error('Translation failed');
+  }
+  
+  return data.translatedText;
 };
 
 export default function LiveTranslateScreen() {
@@ -68,18 +77,22 @@ export default function LiveTranslateScreen() {
     toast.info('Listening... Speak in your selected language');
   };
 
-  const handleStopRecording = () => {
+  const handleStopRecording = async () => {
     stopListening();
     
     if (originalText) {
       setIsProcessing(true);
-      // Simulate translation processing
-      setTimeout(() => {
+      try {
         const langName = languages.find(l => l.code === selectedLang)?.name || 'Unknown';
-        setTranslatedText(translateToEnglish(originalText, langName));
-        setIsProcessing(false);
+        const translated = await translateToEnglish(originalText, langName);
+        setTranslatedText(translated);
         toast.success('Translation complete!');
-      }, 1000);
+      } catch (error) {
+        console.error('Translation error:', error);
+        toast.error('Translation failed. Please try again.');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
