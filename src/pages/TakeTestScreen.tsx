@@ -4,85 +4,110 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MotiButton } from '@/components/ui/MotiButton';
 import { MotiCard } from '@/components/ui/MotiCard';
 import { useData } from '@/contexts/DataContext';
-import { Clock, CheckCircle, XCircle, ArrowLeft, ArrowRight, Flag } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Clock, ArrowLeft, ArrowRight, Flag, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Demo MCQ questions for different subjects
-const questionsBank: Record<string, { question: string; options: string[]; correct: number }[]> = {
-  'Physics': [
-    { question: "What is Newton's First Law also known as?", options: ["Law of Inertia", "Law of Acceleration", "Law of Action-Reaction", "Law of Gravity"], correct: 0 },
-    { question: "What is the SI unit of force?", options: ["Joule", "Newton", "Watt", "Pascal"], correct: 1 },
-    { question: "F = ma represents which law?", options: ["First Law", "Second Law", "Third Law", "Universal Law"], correct: 1 },
-    { question: "What happens when two objects interact?", options: ["One force acts", "Equal opposite forces act", "No force acts", "Random forces act"], correct: 1 },
-    { question: "Mass is a measure of:", options: ["Weight", "Volume", "Inertia", "Speed"], correct: 2 },
-    { question: "Acceleration due to gravity (g) is approximately:", options: ["9.8 m/s²", "10.8 m/s²", "8.8 m/s²", "11.8 m/s²"], correct: 0 },
-    { question: "Which quantity is a vector?", options: ["Mass", "Speed", "Force", "Energy"], correct: 2 },
-    { question: "Work done is measured in:", options: ["Newton", "Joule", "Watt", "Hertz"], correct: 1 },
-    { question: "Power is defined as:", options: ["Force × Distance", "Work / Time", "Mass × Velocity", "Energy × Time"], correct: 1 },
-    { question: "Momentum = mass × ?", options: ["Acceleration", "Force", "Velocity", "Distance"], correct: 2 },
-  ],
-  'Chemistry': [
-    { question: "What is the atomic number of Carbon?", options: ["5", "6", "7", "8"], correct: 1 },
-    { question: "H₂O is the formula for:", options: ["Hydrogen", "Oxygen", "Water", "Helium"], correct: 2 },
-    { question: "Which element is a noble gas?", options: ["Oxygen", "Nitrogen", "Helium", "Hydrogen"], correct: 2 },
-    { question: "The pH of pure water is:", options: ["0", "7", "14", "1"], correct: 1 },
-    { question: "NaCl is commonly known as:", options: ["Sugar", "Baking Soda", "Table Salt", "Vinegar"], correct: 2 },
-    { question: "Which is an alkali metal?", options: ["Calcium", "Sodium", "Magnesium", "Aluminum"], correct: 1 },
-    { question: "Protons have which charge?", options: ["Positive", "Negative", "Neutral", "Variable"], correct: 0 },
-    { question: "How many electrons in a neutral Carbon atom?", options: ["4", "6", "8", "12"], correct: 1 },
-    { question: "Which bond involves sharing of electrons?", options: ["Ionic", "Covalent", "Metallic", "Hydrogen"], correct: 1 },
-    { question: "The center of an atom is called:", options: ["Electron cloud", "Nucleus", "Orbital", "Shell"], correct: 1 },
-  ],
-  'Mathematics': [
-    { question: "What is the derivative of x²?", options: ["x", "2x", "2", "x³"], correct: 1 },
-    { question: "∫ 2x dx = ?", options: ["x²", "x² + C", "2x²", "x"], correct: 1 },
-    { question: "What is sin(90°)?", options: ["0", "1", "-1", "∞"], correct: 1 },
-    { question: "The value of π is approximately:", options: ["3.14", "2.14", "4.14", "3.41"], correct: 0 },
-    { question: "log₁₀(100) = ?", options: ["1", "2", "10", "100"], correct: 1 },
-    { question: "What is the quadratic formula?", options: ["x = -b/2a", "x = (-b±√(b²-4ac))/2a", "x = b²-4ac", "x = 2a/b"], correct: 1 },
-    { question: "Sum of angles in a triangle:", options: ["90°", "180°", "270°", "360°"], correct: 1 },
-    { question: "If f(x) = x³, then f'(x) = ?", options: ["x²", "3x²", "3x", "x³"], correct: 1 },
-    { question: "What is e approximately equal to?", options: ["2.718", "3.141", "1.414", "1.732"], correct: 0 },
-    { question: "cos(0°) = ?", options: ["0", "1", "-1", "∞"], correct: 1 },
-  ],
-  'Biology': [
-    { question: "What is the powerhouse of the cell?", options: ["Nucleus", "Mitochondria", "Ribosome", "Golgi Body"], correct: 1 },
-    { question: "DNA stands for:", options: ["Deoxyribonucleic Acid", "Diribonucleic Acid", "Deoxyribose Acid", "Dinucleic Acid"], correct: 0 },
-    { question: "Which organelle contains genetic material?", options: ["Ribosome", "Lysosome", "Nucleus", "Vacuole"], correct: 2 },
-    { question: "Photosynthesis occurs in:", options: ["Mitochondria", "Chloroplast", "Nucleus", "Ribosome"], correct: 1 },
-    { question: "The basic unit of life is:", options: ["Atom", "Molecule", "Cell", "Tissue"], correct: 2 },
-    { question: "Red blood cells carry:", options: ["Carbon dioxide", "Oxygen", "Nitrogen", "Helium"], correct: 1 },
-    { question: "Which vitamin is produced by sunlight?", options: ["Vitamin A", "Vitamin B", "Vitamin C", "Vitamin D"], correct: 3 },
-    { question: "The human body has how many chromosomes?", options: ["23", "46", "44", "48"], correct: 1 },
-    { question: "Insulin is produced by:", options: ["Liver", "Pancreas", "Kidney", "Heart"], correct: 1 },
-    { question: "Which blood type is universal donor?", options: ["A", "B", "AB", "O"], correct: 3 },
-  ],
-};
+interface Question {
+  id: string;
+  question: string;
+  options: string[];
+  correct_answer: number;
+  order_index: number;
+}
 
-const testDetails: Record<string, { subject: string; topic: string; duration: number }> = {
-  '1': { subject: 'Physics', topic: "Newton's Laws", duration: 20 },
-  '2': { subject: 'Chemistry', topic: 'Periodic Table', duration: 15 },
-  '3': { subject: 'Mathematics', topic: 'Calculus Basics', duration: 30 },
-  '4': { subject: 'Biology', topic: 'Cell Structure', duration: 18 },
-};
+interface TestInfo {
+  id: string;
+  title: string;
+  subject: string;
+  description: string | null;
+  duration_minutes: number | null;
+  total_questions: number | null;
+}
 
 export default function TakeTestScreen() {
   const { testId } = useParams();
   const navigate = useNavigate();
   const { addTestResult, addStudyTime } = useData();
+  const { user } = useAuth();
 
-  const test = testDetails[testId || '1'];
-  const questions = questionsBank[test?.subject] || questionsBank['Physics'];
+  const [test, setTest] = useState<TestInfo | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
-  const [timeLeft, setTimeLeft] = useState((test?.duration || 20) * 60);
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (testId) {
+      fetchTestAndQuestions();
+    }
+  }, [testId]);
+
+  const fetchTestAndQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch test info
+      const { data: testData, error: testError } = await supabase
+        .from('tests')
+        .select('*')
+        .eq('id', testId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (testError) throw testError;
+      if (!testData) {
+        setError('Test not found or is no longer available');
+        return;
+      }
+
+      setTest(testData);
+      setTimeLeft((testData.duration_minutes || 30) * 60);
+
+      // Fetch questions
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('test_id', testId)
+        .order('order_index');
+
+      if (questionsError) throw questionsError;
+      
+      if (!questionsData || questionsData.length === 0) {
+        setError('No questions available for this test');
+        return;
+      }
+
+      // Parse options from JSONB
+      const parsedQuestions: Question[] = questionsData.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options : JSON.parse(q.options as string),
+        correct_answer: q.correct_answer,
+        order_index: q.order_index || 0
+      }));
+
+      setQuestions(parsedQuestions);
+      setAnswers(new Array(parsedQuestions.length).fill(null));
+    } catch (err) {
+      console.error('Error fetching test:', err);
+      setError('Failed to load test. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Timer
   useEffect(() => {
-    if (isSubmitted) return;
+    if (isSubmitted || loading || !test) return;
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -96,7 +121,7 @@ export default function TakeTestScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isSubmitted]);
+  }, [isSubmitted, loading, test]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -110,45 +135,105 @@ export default function TakeTestScreen() {
     setAnswers(newAnswers);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!test || !user || submitting) return;
+    
+    setSubmitting(true);
     setIsSubmitted(true);
     
     // Calculate score
     let correct = 0;
+    const answersJson: Record<string, { selected: number | null; correct: number }> = {};
+    
     questions.forEach((q, i) => {
-      if (answers[i] === q.correct) correct++;
+      if (answers[i] === q.correct_answer) correct++;
+      answersJson[q.id] = {
+        selected: answers[i],
+        correct: q.correct_answer
+      };
     });
 
     const percentage = Math.round((correct / questions.length) * 100);
-    const timeTaken = (test?.duration || 20) - Math.floor(timeLeft / 60);
+    const timeTakenSeconds = (test.duration_minutes || 30) * 60 - timeLeft;
 
-    // Save result
-    addTestResult({
-      subject: test.subject,
-      topic: test.topic,
-      score: correct,
-      total: questions.length,
-      percentage,
-      date: new Date().toLocaleDateString('en-IN', { 
-        day: 'numeric', 
-        month: 'short', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }),
-    });
+    try {
+      // Save to database
+      const { error: insertError } = await supabase
+        .from('test_results')
+        .insert({
+          user_id: user.id,
+          test_id: test.id,
+          score: correct,
+          total_questions: questions.length,
+          time_taken_seconds: timeTakenSeconds,
+          answers: answersJson
+        });
 
-    // Add study time
-    addStudyTime(timeTaken);
+      if (insertError) throw insertError;
 
-    toast.success(`Test completed! You scored ${percentage}%`);
-    setShowResults(true);
+      // Update local state
+      addTestResult({
+        subject: test.subject,
+        topic: test.title,
+        score: correct,
+        total: questions.length,
+        percentage,
+        date: new Date().toLocaleDateString('en-IN', { 
+          day: 'numeric', 
+          month: 'short', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+      });
+
+      // Add study time (in minutes)
+      addStudyTime(Math.ceil(timeTakenSeconds / 60));
+
+      toast.success(`Test completed! You scored ${percentage}%`);
+    } catch (err) {
+      console.error('Error saving result:', err);
+      toast.error('Failed to save result, but your score was calculated');
+    } finally {
+      setSubmitting(false);
+      setShowResults(true);
+    }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="mobile-container min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading test...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !test) {
+    return (
+      <div className="mobile-container min-h-screen flex items-center justify-center px-6">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="text-xl font-bold mb-2">Oops!</h1>
+          <p className="text-muted-foreground mb-6">{error || 'Test not found'}</p>
+          <MotiButton onClick={() => navigate('/tests')}>
+            Back to Tests
+          </MotiButton>
+        </div>
+      </div>
+    );
+  }
 
   // Results screen
   if (showResults) {
     let correct = 0;
     questions.forEach((q, i) => {
-      if (answers[i] === q.correct) correct++;
+      if (answers[i] === q.correct_answer) correct++;
     });
     const percentage = Math.round((correct / questions.length) * 100);
 
@@ -204,7 +289,7 @@ export default function TakeTestScreen() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-bold">{test.subject}</h1>
-            <p className="text-xs text-muted-foreground">{test.topic}</p>
+            <p className="text-xs text-muted-foreground">{test.title}</p>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
             timeLeft < 60 ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
@@ -292,9 +377,10 @@ export default function TakeTestScreen() {
               <MotiButton
                 onClick={handleSubmit}
                 size="full"
-                icon={<Flag size={18} />}
+                icon={submitting ? <Loader2 size={18} className="animate-spin" /> : <Flag size={18} />}
+                disabled={submitting}
               >
-                Submit Test
+                {submitting ? 'Submitting...' : 'Submit Test'}
               </MotiButton>
             ) : (
               <MotiButton
