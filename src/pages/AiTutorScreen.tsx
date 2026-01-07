@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MediaFile {
   id: string;
@@ -22,194 +24,6 @@ interface Message {
   timestamp: Date;
 }
 
-// Comprehensive AI response system
-const aiKnowledgeBase: Record<string, string> = {
-  'photosynthesis': `**Photosynthesis** is how plants make their food using sunlight.
-
-**Formula:** 6CO₂ + 6H₂O + Light → C₆H₁₂O₆ + 6O₂
-
-**Key Points:**
-• Happens in chloroplasts
-• Chlorophyll captures light energy
-• Produces glucose and oxygen
-• Essential for life on Earth`,
-
-  'newton': `**Newton's Laws of Motion**
-
-**1st Law (Inertia):** Objects stay at rest or in motion unless acted upon by a force.
-
-**2nd Law:** F = ma (Force = mass × acceleration)
-
-**3rd Law:** Every action has an equal and opposite reaction.
-
-*Example: When you push a wall, it pushes back with equal force.*`,
-
-  'atomic': `**Atomic Structure**
-
-**Components:**
-• **Protons** (+) - in nucleus
-• **Neutrons** (0) - in nucleus  
-• **Electrons** (-) - orbit nucleus
-
-**Key Numbers:**
-• Atomic Number = Protons
-• Mass Number = Protons + Neutrons
-
-**Shell Capacity:** 2, 8, 18, 32...`,
-
-  'quadratic': `**Quadratic Formula**
-
-For ax² + bx + c = 0:
-
-**x = (-b ± √(b² - 4ac)) / 2a**
-
-**Discriminant (D = b² - 4ac):**
-• D > 0 → Two real solutions
-• D = 0 → One solution
-• D < 0 → No real solutions`,
-
-  'cell': `**Cell Structure**
-
-**Prokaryotic** (bacteria): No nucleus, simple
-**Eukaryotic** (plants/animals): Has nucleus, complex
-
-**Key Organelles:**
-• Nucleus - Control center
-• Mitochondria - Energy production
-• Ribosomes - Protein synthesis
-• ER - Transport system`,
-
-  'exam': `**Exam Preparation Tips**
-
-**Study Techniques:**
-• Use Pomodoro (25 min work, 5 min break)
-• Practice past papers
-• Teach concepts to others
-• Use spaced repetition
-
-**Before Exam:**
-• Sleep 7-8 hours
-• Eat healthy breakfast
-• Arrive early, stay calm`,
-
-  'derivative': `**Derivatives in Calculus**
-
-**Power Rule:** d/dx(xⁿ) = n·xⁿ⁻¹
-
-**Common Derivatives:**
-• d/dx(x²) = 2x
-• d/dx(sin x) = cos x
-• d/dx(eˣ) = eˣ
-
-**Product Rule:** (fg)' = f'g + fg'`,
-
-  'periodic': `**Periodic Table**
-
-**Groups (Columns):**
-• Group 1 - Alkali Metals (reactive)
-• Group 17 - Halogens
-• Group 18 - Noble Gases (stable)
-
-**Trends:**
-• Left→Right: Size ↓, Electronegativity ↑
-• Top→Bottom: Size ↑`,
-
-  'integration': `**Integration Basics**
-
-**Power Rule:** ∫xⁿ dx = xⁿ⁺¹/(n+1) + C
-
-**Common Integrals:**
-• ∫eˣ dx = eˣ + C
-• ∫sin x dx = -cos x + C
-• ∫1/x dx = ln|x| + C
-
-*Always add constant C!*`,
-
-  'water cycle': `**Water Cycle**
-
-**4 Stages:**
-1. **Evaporation** - Sun heats water → vapor
-2. **Condensation** - Vapor cools → clouds
-3. **Precipitation** - Rain, snow, hail
-4. **Collection** - Water returns to oceans/lakes
-
-*Cycle repeats continuously!*`,
-
-  'machine learning': `**Machine Learning Basics**
-
-**Types:**
-• **Supervised Learning** - Labeled data (classification, regression)
-• **Unsupervised Learning** - No labels (clustering, dimensionality reduction)
-• **Reinforcement Learning** - Learn from rewards
-
-**Key Algorithms:**
-• Linear/Logistic Regression
-• Decision Trees
-• Neural Networks
-• SVM, K-means`,
-
-  'data structure': `**Data Structures**
-
-**Linear:**
-• Arrays - Fixed size, O(1) access
-• Linked Lists - Dynamic, O(n) access
-• Stacks - LIFO
-• Queues - FIFO
-
-**Non-Linear:**
-• Trees - Hierarchical
-• Graphs - Connected nodes
-• Hash Tables - O(1) average lookup`,
-
-  'algorithm': `**Algorithm Complexity**
-
-**Big O Notation:**
-• O(1) - Constant
-• O(log n) - Logarithmic  
-• O(n) - Linear
-• O(n log n) - Linearithmic
-• O(n²) - Quadratic
-
-**Common Algorithms:**
-• Binary Search - O(log n)
-• QuickSort - O(n log n) avg
-• BFS/DFS - O(V + E)`,
-};
-
-const getAiResponse = (query: string, hasMedia: boolean = false): string => {
-  const q = query.toLowerCase();
-  
-  if (hasMedia) {
-    const mediaResponse = "I can see the file you've shared. ";
-    for (const [key, response] of Object.entries(aiKnowledgeBase)) {
-      if (q.includes(key)) {
-        return mediaResponse + "Based on your question:\n\n" + response;
-      }
-    }
-    return mediaResponse + "I've analyzed this content. What specific questions do you have about it?";
-  }
-  
-  for (const [key, response] of Object.entries(aiKnowledgeBase)) {
-    if (q.includes(key)) {
-      return response;
-    }
-  }
-
-  if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-    return "Hi! I'm your AI study companion. I can help with Physics, Chemistry, Biology, Math, CS, and study tips. What would you like to learn?";
-  }
-
-  if (q.includes('thank')) {
-    return "You're welcome! Feel free to ask anything else. Good luck with your studies!";
-  }
-
-  if (q.includes('formula')) {
-    return "**Key Formulas:**\n\n**Physics:** F=ma, v=u+at, E=mc²\n**Chemistry:** PV=nRT, n=m/M\n**Math:** (a+b)²=a²+2ab+b²\n\nWhich subject do you need more formulas for?";
-  }
-
-  return "I'd be happy to help! Could you be more specific? I can explain:\n\n• Physics, Chemistry, Biology, Math topics\n• Data Structures & Algorithms\n• Machine Learning concepts\n• Problem solving techniques\n• Exam preparation tips\n\nJust ask about any topic!";
-};
-
 const suggestions = [
   "Explain photosynthesis",
   "Newton's laws of motion", 
@@ -217,12 +31,17 @@ const suggestions = [
   "Tips for exam preparation",
 ];
 
+const AI_TUTOR_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-tutor`;
+
 export default function AiTutorScreen() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [attachedMedia, setAttachedMedia] = useState<MediaFile[]>([]);
   const [showMediaOptions, setShowMediaOptions] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -235,6 +54,20 @@ export default function AiTutorScreen() {
     stopListening, 
     isSupported: speechSupported 
   } = useSpeechRecognition();
+
+  // Fetch user profile for context
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (data) setUserProfile(data);
+    };
+    fetchProfile();
+  }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -299,6 +132,126 @@ export default function AiTutorScreen() {
     }
   };
 
+  const streamChat = async (userMessage: string) => {
+    const newChatHistory = [...chatHistory, { role: 'user' as const, content: userMessage }];
+    setChatHistory(newChatHistory);
+
+    const resp = await fetch(AI_TUTOR_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ 
+        messages: newChatHistory,
+        userProfile 
+      }),
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      throw new Error(errorData.error || `Request failed with status ${resp.status}`);
+    }
+
+    if (!resp.body) throw new Error("No response body");
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let textBuffer = "";
+    let assistantContent = "";
+    let streamDone = false;
+
+    while (!streamDone) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      textBuffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex: number;
+      while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+        let line = textBuffer.slice(0, newlineIndex);
+        textBuffer = textBuffer.slice(newlineIndex + 1);
+
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (line.startsWith(":") || line.trim() === "") continue;
+        if (!line.startsWith("data: ")) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") {
+          streamDone = true;
+          break;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          if (content) {
+            assistantContent += content;
+            // Update the last assistant message
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.type === "bot") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text: assistantContent } : m));
+              }
+              return [...prev, { 
+                id: Date.now().toString(), 
+                type: "bot", 
+                text: assistantContent,
+                timestamp: new Date()
+              }];
+            });
+          }
+        } catch {
+          textBuffer = line + "\n" + textBuffer;
+          break;
+        }
+      }
+    }
+
+    // Final flush
+    if (textBuffer.trim()) {
+      for (let raw of textBuffer.split("\n")) {
+        if (!raw) continue;
+        if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+        if (raw.startsWith(":") || raw.trim() === "") continue;
+        if (!raw.startsWith("data: ")) continue;
+        const jsonStr = raw.slice(6).trim();
+        if (jsonStr === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          if (content) {
+            assistantContent += content;
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.type === "bot") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text: assistantContent } : m));
+              }
+              return [...prev, { 
+                id: Date.now().toString(), 
+                type: "bot", 
+                text: assistantContent,
+                timestamp: new Date()
+              }];
+            });
+          }
+        } catch { /* ignore partial leftovers */ }
+      }
+    }
+
+    // Update chat history with assistant response
+    setChatHistory(prev => [...prev, { role: 'assistant' as const, content: assistantContent }]);
+
+    // Save to database
+    if (user && assistantContent) {
+      await supabase.from('chat_history').insert({
+        user_id: user.id,
+        message: userMessage,
+        response: assistantContent,
+        subject: userProfile?.subjects?.[0] || null
+      });
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() && attachedMedia.length === 0) return;
 
@@ -312,22 +265,25 @@ export default function AiTutorScreen() {
 
     setMessages(prev => [...prev, userMessage]);
     const currentInput = input;
-    const hadMedia = attachedMedia.length > 0;
     setInput('');
     setAttachedMedia([]);
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
+    try {
+      await streamChat(currentInput);
+    } catch (error) {
+      console.error('AI Tutor error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to get response');
+      // Add error message
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
         type: 'bot',
-        text: getAiResponse(currentInput, hadMedia),
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botResponse]);
+        text: "I'm having trouble connecting right now. Please try again in a moment.",
+        timestamp: new Date()
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 800 + Math.random() * 800);
+    }
   };
 
   const handleSuggestion = (text: string) => {
@@ -440,7 +396,7 @@ export default function AiTutorScreen() {
             </AnimatePresence>
 
             {/* Typing Indicator */}
-            {isTyping && (
+            {isTyping && messages[messages.length - 1]?.type !== 'bot' && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -504,7 +460,7 @@ export default function AiTutorScreen() {
                     )}
                     <button
                       onClick={() => removeMedia(m.id)}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X size={12} />
                     </button>
@@ -514,71 +470,57 @@ export default function AiTutorScreen() {
             )}
 
             {/* Input Container */}
-            <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl p-2">
+            <div className="flex items-end gap-2 bg-card border border-border rounded-2xl p-2">
               {/* Media Button */}
               <div className="relative">
                 <Button
-                  variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-xl"
+                  variant="ghost"
+                  className="h-9 w-9 rounded-xl shrink-0"
                   onClick={() => setShowMediaOptions(!showMediaOptions)}
                 >
-                  <Plus size={20} className="text-muted-foreground" />
+                  <Plus size={18} />
                 </Button>
-
+                
                 {/* Media Options Popup */}
                 <AnimatePresence>
                   {showMediaOptions && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute bottom-12 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50"
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                      className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-xl p-2 shadow-lg"
                     >
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => handleFileSelect(e, 'image')}
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full"
-                      >
-                        <Image size={18} className="text-primary" />
-                        <span className="text-sm">Upload Image</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = '.pdf,.doc,.docx,.txt';
-                          input.multiple = true;
-                          input.onchange = (e) => handleFileSelect(e as any, 'document');
-                          input.click();
-                        }}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full border-t border-border"
-                      >
-                        <FileText size={18} className="text-primary" />
-                        <span className="text-sm">Upload Document</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = 'image/*';
-                          input.capture = 'environment';
-                          input.onchange = (e) => handleFileSelect(e as any, 'image');
-                          input.click();
-                          setShowMediaOptions(false);
-                        }}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors w-full border-t border-border"
-                      >
-                        <Camera size={18} className="text-primary" />
-                        <span className="text-sm">Take Photo</span>
-                      </button>
+                      <div className="flex gap-1">
+                        <label className="p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors">
+                          <Image size={18} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileSelect(e, 'image')}
+                          />
+                        </label>
+                        <label className="p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors">
+                          <FileText size={18} />
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt"
+                            className="hidden"
+                            onChange={(e) => handleFileSelect(e, 'document')}
+                          />
+                        </label>
+                        <label className="p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors">
+                          <Camera size={18} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => handleFileSelect(e, 'image')}
+                          />
+                        </label>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -591,34 +533,38 @@ export default function AiTutorScreen() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything..."
-                className="flex-1 bg-transparent border-none resize-none text-sm placeholder:text-muted-foreground focus:outline-none py-2 px-2 max-h-32"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-muted-foreground min-h-[36px] max-h-[120px] py-2"
                 rows={1}
               />
 
-              {/* Voice Input Button */}
+              {/* Voice Button */}
               <Button
-                variant="ghost"
                 size="icon"
-                className={`h-9 w-9 rounded-xl ${isListening ? 'bg-primary/20 text-primary' : ''}`}
+                variant="ghost"
+                className={`h-9 w-9 rounded-xl shrink-0 ${isListening ? 'bg-primary/20 text-primary' : ''}`}
                 onClick={handleVoiceInput}
               >
-                {isListening ? <MicOff size={18} /> : <Mic size={18} className="text-muted-foreground" />}
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
               </Button>
 
               {/* Send Button */}
               <Button
-                onClick={handleSend}
-                disabled={!input.trim() && attachedMedia.length === 0}
                 size="icon"
-                className="h-9 w-9 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40"
+                className="h-9 w-9 rounded-xl shrink-0"
+                onClick={handleSend}
+                disabled={(!input.trim() && attachedMedia.length === 0) || isTyping}
               >
                 <Send size={16} />
               </Button>
             </div>
 
-            <p className="text-xs text-center text-muted-foreground mt-2">
-              AI can make mistakes. Verify important information.
-            </p>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={(e) => handleFileSelect(e, 'image')}
+              accept="image/*"
+            />
           </div>
         </div>
       </div>
