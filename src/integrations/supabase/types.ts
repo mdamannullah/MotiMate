@@ -107,6 +107,36 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_otps: {
+        Row: {
+          attempts: number | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          used: boolean | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          otp_hash: string
+          used?: boolean | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          used?: boolean | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           board: string | null
@@ -311,7 +341,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_expired_otps: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
