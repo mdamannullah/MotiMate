@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 
 // User profile type with education data
 interface EducationData {
@@ -21,7 +19,14 @@ interface EducationData {
   subjects: string[];
 }
 
-interface UserProfile {
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+}
+
+export interface UserProfile {
   id: string;
   user_id: string;
   full_name: string;
@@ -45,9 +50,8 @@ interface UserProfile {
 }
 
 interface AuthContextType {
-  user: SupabaseUser | null;
+  user: User | null;
   profile: UserProfile | null;
-  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   pendingEmail: string | null;
@@ -63,94 +67,105 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Local storage keys
+const USERS_KEY = 'motimate_users';
+const CURRENT_USER_KEY = 'motimate_current_user';
+const PROFILES_KEY = 'motimate_profiles';
+
+// Helper functions for local storage
+const getUsers = (): Record<string, { password: string; user: User }> => {
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const getProfiles = (): Record<string, UserProfile> => {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILES_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const saveUsers = (users: Record<string, { password: string; user: User }>) => {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+};
+
+const saveProfiles = (profiles: Record<string, UserProfile>) => {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
-  // Fetch user profile
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
+  // Load current user on mount
+  useEffect(() => {
+    const loadUser = () => {
+      try {
+        const storedUser = localStorage.getItem(CURRENT_USER_KEY);
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          
+          // Load profile
+          const profiles = getProfiles();
+          const userProfile = profiles[parsedUser.id];
+          if (userProfile) {
+            setProfile(userProfile);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
       }
-      return data;
-    } catch (err) {
-      console.error('Profile fetch error:', err);
-      return null;
-    }
-  };
+      setIsLoading(false);
+    };
+
+    loadUser();
+  }, []);
 
   const refreshProfile = async () => {
     if (user) {
-      const profileData = await fetchProfile(user.id);
-      setProfile(profileData);
+      const profiles = getProfiles();
+      const userProfile = profiles[user.id];
+      if (userProfile) {
+        setProfile(userProfile);
+      }
     }
   };
-
-  // Set up auth state listener
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Defer profile fetch
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id).then(setProfile);
-          }, 0);
-        } else {
-          setProfile(null);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile);
-      }
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const users = getUsers();
+      const userEntry = users[email.toLowerCase()];
+      
+      if (!userEntry) {
         setIsLoading(false);
-        return { success: false, error: error.message };
+        return { success: false, error: 'No account found with this email' };
       }
-
-      // Create login notification
-      if (data.user) {
-        await supabase.from('notifications').insert({
-          user_id: data.user.id,
-          title: 'Login Successful',
-          message: 'Welcome back to MotiMate!',
-          type: 'login'
-        });
+      
+      if (userEntry.password !== password) {
+        setIsLoading(false);
+        return { success: false, error: 'Invalid password' };
+      }
+      
+      // Set current user
+      setUser(userEntry.user);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userEntry.user));
+      
+      // Load profile
+      const profiles = getProfiles();
+      const userProfile = profiles[userEntry.user.id];
+      if (userProfile) {
+        setProfile(userProfile);
       }
 
       setIsLoading(false);
@@ -169,53 +184,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/dashboard`;
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: name,
-          }
-        }
-      });
-
-      if (error) {
+      const users = getUsers();
+      const normalizedEmail = email.toLowerCase();
+      
+      // Check if user already exists
+      if (users[normalizedEmail]) {
         setIsLoading(false);
-        return { success: false, error: error.message };
+        return { success: false, error: 'An account with this email already exists' };
       }
-
-      // Update profile with education data if user was created
-      if (data.user && educationData) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: name,
-            country: educationData.country,
-            country_code: educationData.country,
-            state: educationData.state,
-            district: educationData.district,
-            education_level: educationData.level,
-            board: educationData.board,
-            course: educationData.course,
-            university: educationData.university,
-            college: educationData.college,
-            is_autonomous: educationData.isAutonomous,
-            department: educationData.department,
-            stream: educationData.stream,
-            year: educationData.year,
-            semester: educationData.semester,
-            regulation: educationData.regulation,
-            subjects: educationData.subjects,
-          })
-          .eq('user_id', data.user.id);
-
-        if (profileError) {
-          console.error('Profile update error:', profileError);
-        }
-      }
+      
+      // Create new user
+      const userId = crypto.randomUUID();
+      const newUser: User = {
+        id: userId,
+        email: normalizedEmail,
+        full_name: name,
+        created_at: new Date().toISOString()
+      };
+      
+      // Save user
+      users[normalizedEmail] = { password, user: newUser };
+      saveUsers(users);
+      
+      // Create profile
+      const profiles = getProfiles();
+      const newProfile: UserProfile = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        full_name: name,
+        email: normalizedEmail,
+        country: educationData?.country,
+        state: educationData?.state,
+        district: educationData?.district,
+        education_level: educationData?.level,
+        board: educationData?.board,
+        course: educationData?.course,
+        university: educationData?.university,
+        college: educationData?.college,
+        is_autonomous: educationData?.isAutonomous,
+        department: educationData?.department,
+        stream: educationData?.stream,
+        year: educationData?.year,
+        semester: educationData?.semester,
+        regulation: educationData?.regulation,
+        subjects: educationData?.subjects || [],
+      };
+      profiles[userId] = newProfile;
+      saveProfiles(profiles);
+      
+      // Set current user
+      setUser(newUser);
+      setProfile(newProfile);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
 
       setPendingEmail(email);
       setIsLoading(false);
@@ -227,27 +250,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem(CURRENT_USER_KEY);
     setUser(null);
-    setSession(null);
     setProfile(null);
   };
 
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Use OTP-based password reset flow
-      const { data, error } = await supabase.functions.invoke('password-reset', {
-        body: { action: 'send', email }
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      if (!data?.success) {
-        return { success: false, error: data?.error || 'Failed to send OTP' };
-      }
-
       setPendingEmail(email);
       return { success: true };
     } catch (err) {
@@ -257,22 +266,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const changePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
+      if (!user) {
+        return { success: false, error: 'Not logged in' };
       }
-
-      // Create notification
-      if (user) {
-        await supabase.from('notifications').insert({
-          user_id: user.id,
-          title: 'Password Changed',
-          message: 'Your password has been updated successfully.',
-          type: 'password_change'
-        });
+      
+      const users = getUsers();
+      const normalizedEmail = user.email.toLowerCase();
+      
+      if (users[normalizedEmail]) {
+        users[normalizedEmail].password = newPassword;
+        saveUsers(users);
       }
 
       return { success: true };
@@ -285,15 +288,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { success: false, error: 'Not logged in' };
     
     try {
-      // Delete user data first (cascade should handle this, but being safe)
-      await supabase.from('notes').delete().eq('user_id', user.id);
-      await supabase.from('test_results').delete().eq('user_id', user.id);
-      await supabase.from('notifications').delete().eq('user_id', user.id);
-      await supabase.from('chat_history').delete().eq('user_id', user.id);
-      await supabase.from('profiles').delete().eq('user_id', user.id);
+      const users = getUsers();
+      const profiles = getProfiles();
+      const normalizedEmail = user.email.toLowerCase();
       
-      // Note: Actual user deletion requires admin rights or a server function
-      // For now, we'll just sign out
+      // Delete user data
+      delete users[normalizedEmail];
+      delete profiles[user.id];
+      
+      saveUsers(users);
+      saveProfiles(profiles);
+      
+      // Clear local data for user
+      localStorage.removeItem(`motimate_notes_${user.id}`);
+      localStorage.removeItem(`motimate_test_results_${user.id}`);
+      localStorage.removeItem(`motimate_notifications_${user.id}`);
+      localStorage.removeItem(`motimate_chat_history_${user.id}`);
+      
       await logout();
       
       return { success: true };
@@ -306,16 +317,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { success: false, error: 'Not logged in' };
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('user_id', user.id);
-
-      if (error) {
-        return { success: false, error: error.message };
+      const profiles = getProfiles();
+      const currentProfile = profiles[user.id];
+      
+      if (currentProfile) {
+        profiles[user.id] = { ...currentProfile, ...updates };
+        saveProfiles(profiles);
+        setProfile(profiles[user.id]);
       }
 
-      await refreshProfile();
       return { success: true };
     } catch (err) {
       return { success: false, error: 'Failed to update profile.' };
@@ -327,7 +337,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         profile,
-        session,
         isAuthenticated: !!user,
         isLoading,
         pendingEmail,

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
 interface UserStats {
@@ -10,7 +9,7 @@ interface UserStats {
   totalScore: number;
 }
 
-interface TestResult {
+export interface TestResult {
   id: string;
   subject: string;
   topic: string;
@@ -21,7 +20,7 @@ interface TestResult {
   timestamp: number;
 }
 
-interface Notification {
+export interface Notification {
   id: string;
   type: 'login' | 'signup' | 'password_change' | 'test_completed' | 'achievement' | 'reminder' | 'success' | 'info';
   title: string;
@@ -64,6 +63,25 @@ const getInitialStats = (): UserStats => ({
   totalScore: 0,
 });
 
+// Local storage helpers
+const getStorageKey = (userId: string | undefined, key: string) => 
+  userId ? `motimate_${key}_${userId}` : null;
+
+const loadFromStorage = <T,>(key: string | null, defaultValue: T): T => {
+  if (!key) return defaultValue;
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveToStorage = (key: string | null, data: unknown) => {
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(data));
+};
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [stats, setStats] = useState<UserStats>(getInitialStats);
@@ -71,7 +89,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [subjectScores, setSubjectScores] = useState<Record<string, SubjectScore>>({});
 
-  // Fetch data from Supabase when user changes
+  // Load data from localStorage when user changes
   const refreshData = useCallback(async () => {
     if (!user) {
       setStats(getInitialStats());
@@ -82,50 +100,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Fetch test results
-      const { data: testResults, error: testError } = await supabase
-        .from('test_results')
-        .select(`
-          id,
-          score,
-          total_questions,
-          completed_at,
-          time_taken_seconds,
-          tests (
-            title,
-            subject,
-            description
-          )
-        `)
-        .order('completed_at', { ascending: false });
+      // Load test results
+      const testResultsKey = getStorageKey(user.id, 'test_results');
+      const storedResults = loadFromStorage<TestResult[]>(testResultsKey, []);
+      setTestHistory(storedResults);
 
-      if (testError) throw testError;
+      // Load notifications
+      const notificationsKey = getStorageKey(user.id, 'notifications');
+      const storedNotifications = loadFromStorage<Notification[]>(notificationsKey, []);
+      setNotifications(storedNotifications);
 
-      // Transform test results
-      const history: TestResult[] = (testResults || []).map(r => ({
-        id: r.id,
-        subject: r.tests?.subject || 'Unknown',
-        topic: r.tests?.title || r.tests?.description || 'Test',
-        score: r.score,
-        total: r.total_questions,
-        percentage: Math.round((r.score / r.total_questions) * 100),
-        date: r.completed_at ? new Date(r.completed_at).toLocaleDateString('en-IN', {
-          day: 'numeric',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit'
-        }) : 'Unknown',
-        timestamp: r.completed_at ? new Date(r.completed_at).getTime() : Date.now()
-      }));
-
-      setTestHistory(history);
+      // Load notes count
+      const notesKey = getStorageKey(user.id, 'notes');
+      const storedNotes = loadFromStorage<{ id: string }[]>(notesKey, []);
+      const notesCount = storedNotes.length;
 
       // Calculate stats and subject scores
       let totalScore = 0;
       let totalTime = 0;
       const subjectMap: Record<string, SubjectScore> = {};
 
-      history.forEach(result => {
+      storedResults.forEach(result => {
         totalScore += result.percentage;
         
         if (!subjectMap[result.subject]) {
@@ -149,46 +144,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       setSubjectScores(subjectMap);
 
-      // Calculate study time from test results
-      (testResults || []).forEach(r => {
-        if (r.time_taken_seconds) {
-          totalTime += r.time_taken_seconds;
-        }
-      });
-
-      // Fetch notes count
-      const { count: notesCount } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch notifications
-      const { data: notificationsData } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      const formattedNotifications: Notification[] = (notificationsData || []).map(n => ({
-        id: n.id,
-        type: n.type as Notification['type'],
-        title: n.title,
-        message: n.message,
-        timestamp: new Date(n.created_at || '').getTime(),
-        read: n.is_read || false
-      }));
-
-      setNotifications(formattedNotifications);
+      // Load stats
+      const statsKey = getStorageKey(user.id, 'stats');
+      const storedStats = loadFromStorage<UserStats>(statsKey, getInitialStats());
 
       setStats({
-        testsCompleted: history.length,
-        notesCreated: notesCount || 0,
-        studyHours: Math.round((totalTime / 3600) * 10) / 10,
-        avgScore: history.length > 0 ? Math.round(totalScore / history.length) : 0,
+        testsCompleted: storedResults.length,
+        notesCreated: notesCount,
+        studyHours: storedStats.studyHours || 0,
+        avgScore: storedResults.length > 0 ? Math.round(totalScore / storedResults.length) : 0,
         totalScore
       });
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error loading data:', error);
     }
   }, [user]);
 
@@ -196,7 +165,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refreshData();
   }, [refreshData]);
 
-  // Weekly data calculate from test history
+  // Weekly data calculated from test history
   const weeklyData = React.useMemo(() => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const now = new Date();
@@ -220,26 +189,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, [testHistory]);
 
-  // Add test result (local state update - DB save happens in TakeTestScreen)
+  // Add test result
   const addTestResult = (result: Omit<TestResult, 'id' | 'timestamp'>) => {
     const newResult: TestResult = {
       ...result,
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       timestamp: Date.now(),
     };
 
-    setTestHistory(prev => [newResult, ...prev]);
+    const updatedHistory = [newResult, ...testHistory];
+    setTestHistory(updatedHistory);
+
+    // Save to localStorage
+    if (user) {
+      const key = getStorageKey(user.id, 'test_results');
+      saveToStorage(key, updatedHistory);
+    }
 
     // Update stats
     setStats(prev => {
       const newTotalScore = prev.totalScore + result.percentage;
       const newTestsCompleted = prev.testsCompleted + 1;
-      return {
+      const newStats = {
         ...prev,
         testsCompleted: newTestsCompleted,
         totalScore: newTotalScore,
         avgScore: Math.round(newTotalScore / newTestsCompleted),
       };
+      
+      if (user) {
+        const key = getStorageKey(user.id, 'stats');
+        saveToStorage(key, newStats);
+      }
+      
+      return newStats;
     });
 
     // Update subject scores
@@ -263,67 +246,63 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addNotification = async (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     if (!user) return;
 
-    try {
-      const { error } = await supabase.from('notifications').insert({
-        user_id: user.id,
-        title: notification.title,
-        message: notification.message,
-        type: notification.type
-      });
-
-      if (error) throw error;
-
-      const newNotification: Notification = {
-        ...notification,
-        id: Date.now().toString(),
-        timestamp: Date.now(),
-        read: false,
-      };
-      setNotifications(prev => [newNotification, ...prev].slice(0, 50));
-    } catch (error) {
-      console.error('Error adding notification:', error);
-    }
+    const newNotification: Notification = {
+      ...notification,
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      read: false,
+    };
+    
+    const updatedNotifications = [newNotification, ...notifications].slice(0, 50);
+    setNotifications(updatedNotifications);
+    
+    const key = getStorageKey(user.id, 'notifications');
+    saveToStorage(key, updatedNotifications);
   };
 
   const markNotificationRead = async (id: string) => {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', id);
-
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, read: true } : n))
-      );
-    } catch (error) {
-      console.error('Error marking notification read:', error);
-    }
+    if (!user) return;
+    
+    const updatedNotifications = notifications.map(n => 
+      n.id === id ? { ...n, read: true } : n
+    );
+    setNotifications(updatedNotifications);
+    
+    const key = getStorageKey(user.id, 'notifications');
+    saveToStorage(key, updatedNotifications);
   };
 
   const clearAllNotifications = async () => {
     if (!user) return;
-
-    try {
-      await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id);
-
-      setNotifications([]);
-    } catch (error) {
-      console.error('Error clearing notifications:', error);
-    }
+    
+    setNotifications([]);
+    const key = getStorageKey(user.id, 'notifications');
+    saveToStorage(key, []);
   };
 
   const incrementNotes = () => {
-    setStats(prev => ({ ...prev, notesCreated: prev.notesCreated + 1 }));
+    setStats(prev => {
+      const newStats = { ...prev, notesCreated: prev.notesCreated + 1 };
+      if (user) {
+        const key = getStorageKey(user.id, 'stats');
+        saveToStorage(key, newStats);
+      }
+      return newStats;
+    });
   };
 
   const addStudyTime = (minutes: number) => {
-    setStats(prev => ({
-      ...prev,
-      studyHours: Math.round((prev.studyHours * 60 + minutes) / 60 * 10) / 10,
-    }));
+    setStats(prev => {
+      const newStats = {
+        ...prev,
+        studyHours: Math.round((prev.studyHours * 60 + minutes) / 60 * 10) / 10,
+      };
+      if (user) {
+        const key = getStorageKey(user.id, 'stats');
+        saveToStorage(key, newStats);
+      }
+      return newStats;
+    });
   };
 
   const resetUserData = () => {
