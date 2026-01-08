@@ -235,18 +235,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/change-password`,
+      // Use OTP-based password reset flow
+      const { data, error } = await supabase.functions.invoke('password-reset', {
+        body: { action: 'send', email }
       });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Failed to send OTP' };
+      }
+
       setPendingEmail(email);
       return { success: true };
     } catch (err) {
-      return { success: false, error: 'Failed to send reset email.' };
+      return { success: false, error: 'Failed to send reset OTP.' };
     }
   };
 
