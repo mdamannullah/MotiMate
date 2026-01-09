@@ -7,20 +7,14 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { ArrowLeft, Mail, CheckCircle, KeyRound, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { generateOTP, storeOTP, verifyOTP } from '@/services/otpService';
+import { showOtpNotification } from '@/components/ui/OtpNotification';
 
 // Validation schemas - Email aur password ke liye validation rules
 const emailSchema = z.string().email("Enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
 type Step = 'email' | 'otp' | 'password' | 'success';
-
-// Local OTP storage - Memory mein OTP store karte hain
-let storedOTP: { email: string; otp: string; expiresAt: number } | null = null;
-
-// Generate 6-digit OTP - Random 6 digit code generate karta hai
-const generateOTP = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
 
 export default function ForgotPasswordScreen() {
   const navigate = useNavigate();
@@ -59,18 +53,13 @@ export default function ForgotPasswordScreen() {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Generate and store OTP locally (expires in 5 minutes)
+    // Generate and store OTP using service
     const newOTP = generateOTP();
-    storedOTP = {
-      email,
-      otp: newOTP,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
-    };
+    storeOTP(email, newOTP, 'password_reset');
 
-    // Debug: Show OTP in console (for testing)
-    console.log('🔐 Debug OTP:', newOTP);
+    // Show prominent OTP notification
+    showOtpNotification(newOTP, email);
     
-    toast.success('OTP sent! Check console for demo OTP 📧');
     setStep('otp');
     setIsLoading(false);
   };
@@ -88,22 +77,11 @@ export default function ForgotPasswordScreen() {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Verify OTP
-    if (!storedOTP || storedOTP.email !== email) {
-      setError('OTP expired. Please request a new one.');
-      setIsLoading(false);
-      return;
-    }
+    // Verify OTP using service
+    const result = verifyOTP(email, otp, 'password_reset');
 
-    if (Date.now() > storedOTP.expiresAt) {
-      setError('OTP has expired. Please request a new one.');
-      storedOTP = null;
-      setIsLoading(false);
-      return;
-    }
-
-    if (storedOTP.otp !== otp) {
-      setError('Invalid OTP. Please try again.');
+    if (!result.success) {
+      setError(result.error || 'Invalid OTP');
       setIsLoading(false);
       return;
     }
@@ -145,9 +123,6 @@ export default function ForgotPasswordScreen() {
     });
     localStorage.setItem('users', JSON.stringify(updatedUsers));
 
-    // Clear stored OTP
-    storedOTP = null;
-
     toast.success('Password reset successfully! 🎉');
     setStep('success');
     setIsLoading(false);
@@ -157,19 +132,15 @@ export default function ForgotPasswordScreen() {
   const handleResendOTP = async () => {
     setIsLoading(true);
     
-    // Generate new OTP
+    // Generate new OTP using service
     const newOTP = generateOTP();
-    storedOTP = {
-      email,
-      otp: newOTP,
-      expiresAt: Date.now() + 5 * 60 * 1000
-    };
+    storeOTP(email, newOTP, 'password_reset');
 
-    console.log('🔐 New Debug OTP:', newOTP);
+    // Show prominent notification
+    showOtpNotification(newOTP, email);
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    toast.success('New OTP sent! Check console 📧');
     setOtp('');
     setError('');
     setIsLoading(false);
