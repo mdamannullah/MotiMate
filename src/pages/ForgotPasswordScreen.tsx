@@ -6,14 +6,21 @@ import { MotiInput } from '@/components/ui/MotiInput';
 import { OtpInput } from '@/components/ui/OtpInput';
 import { ArrowLeft, Mail, CheckCircle, KeyRound, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 
-// Validation schemas
+// Validation schemas - Email aur password ke liye validation rules
 const emailSchema = z.string().email("Enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
 type Step = 'email' | 'otp' | 'password' | 'success';
+
+// Local OTP storage - Memory mein OTP store karte hain
+let storedOTP: { email: string; otp: string; expiresAt: number } | null = null;
+
+// Generate 6-digit OTP - Random 6 digit code generate karta hai
+const generateOTP = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 export default function ForgotPasswordScreen() {
   const navigate = useNavigate();
@@ -26,7 +33,7 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Step 1: Send OTP
+  // Step 1: Send OTP - Email par OTP bhejta hai (local simulation)
   const handleSendOTP = async () => {
     try {
       emailSchema.parse(email);
@@ -37,35 +44,38 @@ export default function ForgotPasswordScreen() {
       }
     }
 
+    // Check if user exists in localStorage
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const userExists = users.some((u: { email: string }) => u.email === email);
+    
+    if (!userExists) {
+      setError('No account found with this email');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('password-reset', {
-        body: { action: 'send', email }
-      });
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (fnError) throw fnError;
+    // Generate and store OTP locally (expires in 5 minutes)
+    const newOTP = generateOTP();
+    storedOTP = {
+      email,
+      otp: newOTP,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+    };
 
-      if (data?.success) {
-        toast.success('OTP sent to your email! 📧');
-        // Debug: Show OTP in console (remove in production)
-        if (data.debug_otp) {
-          console.log('Debug OTP:', data.debug_otp);
-        }
-        setStep('otp');
-      } else {
-        setError(data?.error || 'Failed to send OTP');
-      }
-    } catch (err) {
-      console.error('Send OTP error:', err);
-      setError('Failed to send OTP. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Debug: Show OTP in console (for testing)
+    console.log('🔐 Debug OTP:', newOTP);
+    
+    toast.success('OTP sent! Check console for demo OTP 📧');
+    setStep('otp');
+    setIsLoading(false);
   };
 
-  // Step 2: Verify OTP
+  // Step 2: Verify OTP - User ne jo OTP daala usse verify karta hai
   const handleVerifyOTP = async () => {
     if (otp.length !== 6) {
       setError('Please enter complete 6-digit OTP');
@@ -75,28 +85,35 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
     setError('');
 
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('password-reset', {
-        body: { action: 'verify', email, otp }
-      });
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-      if (fnError) throw fnError;
-
-      if (data?.success) {
-        toast.success('OTP verified! ✅');
-        setStep('password');
-      } else {
-        setError(data?.error || 'Invalid OTP');
-      }
-    } catch (err) {
-      console.error('Verify OTP error:', err);
-      setError('Verification failed. Please try again.');
-    } finally {
+    // Verify OTP
+    if (!storedOTP || storedOTP.email !== email) {
+      setError('OTP expired. Please request a new one.');
       setIsLoading(false);
+      return;
     }
+
+    if (Date.now() > storedOTP.expiresAt) {
+      setError('OTP has expired. Please request a new one.');
+      storedOTP = null;
+      setIsLoading(false);
+      return;
+    }
+
+    if (storedOTP.otp !== otp) {
+      setError('Invalid OTP. Please try again.');
+      setIsLoading(false);
+      return;
+    }
+
+    toast.success('OTP verified! ✅');
+    setStep('password');
+    setIsLoading(false);
   };
 
-  // Step 3: Reset Password
+  // Step 3: Reset Password - Naya password set karta hai
   const handleResetPassword = async () => {
     try {
       passwordSchema.parse(password);
@@ -115,50 +132,47 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
     setError('');
 
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('password-reset', {
-        body: { action: 'reset', email, otp, newPassword: password }
-      });
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-      if (fnError) throw fnError;
-
-      if (data?.success) {
-        toast.success('Password reset successfully! 🎉');
-        setStep('success');
-      } else {
-        setError(data?.error || 'Failed to reset password');
+    // Update password in localStorage
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const updatedUsers = users.map((u: { email: string; password: string }) => {
+      if (u.email === email) {
+        return { ...u, password };
       }
-    } catch (err) {
-      console.error('Reset password error:', err);
-      setError('Failed to reset password. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+      return u;
+    });
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+
+    // Clear stored OTP
+    storedOTP = null;
+
+    toast.success('Password reset successfully! 🎉');
+    setStep('success');
+    setIsLoading(false);
   };
 
-  // Resend OTP
+  // Resend OTP - Naya OTP bhejta hai
   const handleResendOTP = async () => {
     setIsLoading(true);
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('password-reset', {
-        body: { action: 'send', email }
-      });
+    
+    // Generate new OTP
+    const newOTP = generateOTP();
+    storedOTP = {
+      email,
+      otp: newOTP,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    };
 
-      if (fnError) throw fnError;
-
-      if (data?.success) {
-        toast.success('New OTP sent! 📧');
-        if (data.debug_otp) {
-          console.log('Debug OTP:', data.debug_otp);
-        }
-        setOtp('');
-        setError('');
-      }
-    } catch (err) {
-      toast.error('Failed to resend OTP');
-    } finally {
-      setIsLoading(false);
-    }
+    console.log('🔐 New Debug OTP:', newOTP);
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    toast.success('New OTP sent! Check console 📧');
+    setOtp('');
+    setError('');
+    setIsLoading(false);
   };
 
   // Success state
