@@ -8,6 +8,7 @@ import { ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateOTP, storeOTP, verifyOTP } from '@/services/otpService';
 import { showOtpNotification } from '@/components/ui/OtpNotification';
+import { Footer } from '@/components/layout/Footer';
 
 export default function VerifyOtpScreen() {
   const navigate = useNavigate();
@@ -87,7 +88,8 @@ export default function VerifyOtpScreen() {
     
     setResendTimer(60); 
     setCanResend(false); 
-    setError(''); 
+    setError('');
+    toast.success('New OTP sent!');
   };
 
   return (
@@ -159,11 +161,13 @@ export default function VerifyOtpScreen() {
         </motion.p>
       </div>
       
-      <div className="px-6 pb-8">
+      <div className="px-6 pb-4">
         <MotiButton onClick={handleVerify} size="full" loading={isLoading || verifying}>
           Verify OTP
         </MotiButton>
       </div>
+
+      <Footer />
     </div>
   );
 }

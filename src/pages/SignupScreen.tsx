@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { countries, educationLevels, ugCourses, pgCourses, years, semesters, schoolStreams, getStatesForCountry, getDistrictsForState, getBoardsForState, getUniversitiesForState, getDepartmentsForCourse, getSubjectsForDepartment, validateName, validateEmail, validatePassword } from '@/data/educationData';
 import { generateOTP, storeOTP, verifyOTP } from '@/services/otpService';
 import { showOtpNotification } from '@/components/ui/OtpNotification';
+import { Footer } from '@/components/layout/Footer';
 
 interface DropdownProps { 
   label: string; 
@@ -290,7 +291,7 @@ export default function SignupScreen() {
         <ArrowLeft size={24} />
       </motion.button>
       
-      <div className="flex-1 flex flex-col px-6 pt-20 pb-8 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-6 pt-20 pb-4 overflow-y-auto">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
           {[1,2,3,4,5].map((i) => (
@@ -456,6 +457,8 @@ export default function SignupScreen() {
           )}
         </AnimatePresence>
       </div>
+
+      <Footer />
     </div>
   );
 }
