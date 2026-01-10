@@ -81,9 +81,6 @@ export const OtpNotification = ({ otp, email }: OtpNotificationProps) => {
 
 // Toast function to show OTP notification - Sonner toast ke andar OTP dikhata hai
 export const showOtpNotification = (otp: string, email: string) => {
-  // Console mein bhi OTP dikha do for debugging
-  console.log('🔐 Your OTP Code:', otp);
-  
   toast.custom(
     (t) => (
       <motion.div
@@ -120,14 +117,14 @@ export const showOtpNotification = (otp: string, email: string) => {
             <CopyableOtp otp={otp} />
 
             <p className="text-xs text-muted-foreground text-center">
-              ⏱️ Expires in 5 minutes • Demo mode enabled
+              ⏱️ Expires in 5 minutes
             </p>
           </div>
         </div>
       </motion.div>
     ),
     {
-      duration: 15000, // 15 seconds - zyada time dikhega
+      duration: 15000, // 15 seconds
       position: 'top-center',
     }
   );

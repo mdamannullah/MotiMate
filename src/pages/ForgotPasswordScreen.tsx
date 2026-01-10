@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { generateOTP, storeOTP, verifyOTP } from '@/services/otpService';
 import { showOtpNotification } from '@/components/ui/OtpNotification';
+import { Footer } from '@/components/layout/Footer';
 
 // Validation schemas - Email aur password ke liye validation rules
 const emailSchema = z.string().email("Enter a valid email");
@@ -144,35 +145,39 @@ export default function ForgotPasswordScreen() {
     setOtp('');
     setError('');
     setIsLoading(false);
+    toast.success('New OTP sent!');
   };
 
   // Success state
   if (step === 'success') {
     return (
-      <div className="mobile-container min-h-screen flex flex-col items-center justify-center px-6">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200 }}
-          className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mb-6"
-        >
-          <CheckCircle size={48} className="text-success" />
-        </motion.div>
+      <div className="mobile-container min-h-screen flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200 }}
+            className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mb-6"
+          >
+            <CheckCircle size={48} className="text-success" />
+          </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-2xl font-bold mb-2">Password Reset Successful!</h1>
-          <p className="text-muted-foreground">
-            Your password has been updated. You can now login with your new password.
-          </p>
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-8"
+          >
+            <h1 className="text-2xl font-bold mb-2">Password Reset Successful!</h1>
+            <p className="text-muted-foreground">
+              Your password has been updated. You can now login with your new password.
+            </p>
+          </motion.div>
 
-        <MotiButton onClick={() => navigate('/login')} size="full">
-          Back to Login
-        </MotiButton>
+          <MotiButton onClick={() => navigate('/login')} size="full">
+            Back to Login
+          </MotiButton>
+        </div>
+        <Footer />
       </div>
     );
   }
@@ -376,7 +381,7 @@ export default function ForgotPasswordScreen() {
       </div>
 
       {/* Action button */}
-      <div className="px-6 pb-8">
+      <div className="px-6 pb-4">
         <MotiButton
           onClick={
             step === 'email' ? handleSendOTP :
@@ -391,6 +396,8 @@ export default function ForgotPasswordScreen() {
            'Reset Password'}
         </MotiButton>
       </div>
+
+      <Footer />
     </div>
   );
 }
